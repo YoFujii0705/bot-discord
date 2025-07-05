@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const { google } = require('googleapis');
 const express = require('express');
@@ -32,7 +33,8 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.DirectMessages, // DM対応追加
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.DirectMessageReactions, // 追加
   ],
 });
 
@@ -343,10 +345,10 @@ client.on('messageCreate', async (message) => {
   }
   
   // DMかサーバーかを判定
-  const isDM = message.channel.type === 1; // 1 = DM
+  const isDM = !message.guild; // guildがnullならDM
   const locationInfo = isDM ? 'DM' : `Server: ${message.guild?.name}`;
   
-  console.log(`📍 Location: ${locationInfo}`);
+  console.log(`📍 Location: ${locationInfo} | Channel Type: ${message.channel.type} | Guild: ${message.guild ? 'Yes' : 'No'}`);
   
   // !divineで始まらないメッセージは無視
   if (!message.content.startsWith('!divine')) {
