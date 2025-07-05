@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const { google } = require('googleapis');
 const express = require('express');
 
@@ -34,7 +34,11 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages,
-    GatewayIntentBits.DirectMessageReactions, // 追加
+    GatewayIntentBits.DirectMessageReactions,
+  ],
+  partials: [
+    Partials.Channel, // DMチャンネル用
+    Partials.Message, // DMメッセージ用
   ],
 });
 
@@ -334,6 +338,13 @@ client.on('error', (error) => {
 
 process.on('unhandledRejection', (error) => {
   console.error('Unhandled promise rejection:', error);
+});
+
+// 全てのイベントをデバッグ用にログ出力
+client.on('debug', (info) => {
+  if (info.includes('MESSAGE_CREATE')) {
+    console.log('🔍 MESSAGE_CREATE event detected:', info);
+  }
 });
 
 // メッセージ処理
