@@ -340,37 +340,13 @@ process.on('unhandledRejection', (error) => {
   console.error('Unhandled promise rejection:', error);
 });
 
-// 全てのイベントをデバッグ用にログ出力
-client.on('debug', (info) => {
-  if (info.includes('MESSAGE_CREATE')) {
-    console.log('🔍 MESSAGE_CREATE event detected:', info);
-  }
-});
-
 // メッセージ処理
 client.on('messageCreate', async (message) => {
-  // 全てのメッセージをログ出力（デバッグ用）
-  console.log(`📨 Message received: ${message.author.tag} | Channel Type: ${message.channel.type} | Content: "${message.content}"`);
-  
   // Bot自身のメッセージは無視
-  if (message.author.bot) {
-    console.log(`🤖 Ignored bot message`);
-    return;
-  }
-  
-  // DMかサーバーかを判定
-  const isDM = !message.guild; // guildがnullならDM
-  const locationInfo = isDM ? 'DM' : `Server: ${message.guild?.name}`;
-  
-  console.log(`📍 Location: ${locationInfo} | Channel Type: ${message.channel.type} | Guild: ${message.guild ? 'Yes' : 'No'}`);
+  if (message.author.bot) return;
   
   // !divineで始まらないメッセージは無視
-  if (!message.content.startsWith('!divine')) {
-    console.log(`❌ Not a !divine command`);
-    return;
-  }
-
-  console.log(`🔮 Command from ${message.author.tag} in ${locationInfo}: ${message.content}`);
+  if (!message.content.startsWith('!divine')) return;
 
   const args = message.content.split(' ');
   const command = args[1];
