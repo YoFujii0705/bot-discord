@@ -1,5 +1,5 @@
 claudeでつくりました。Googleスプレッドシートと連携して、discord上でタスクを追加したり、消化したりできます。<br>
-必要なもの→discordのbot、Googleスプレッドシート、Google cloud consoleのサービスアカウント<br>
+必要なもの→discordのbot(guild id はdiscordのサーバーのIDです、client idはbotのApplication ID）、Googleスプレッドシート、Google cloud consoleのサービスアカウント<br>
 Googleスプレッドシートの例です→https://docs.google.com/spreadsheets/d/1S-wInJEbOkYO9Eo3jBlfSJxZTPpLBEVuXyuBocti9js/edit?usp=sharing<br>
 🏆 完成した機能一覧<br>
 📝 基本機能<br>
