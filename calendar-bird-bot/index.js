@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Client, GatewayIntentBits, SlashCommandBuilder, EmbedBuilder, REST, Routes } = require('discord.js');
 const { google } = require('googleapis');
 const cron = require('node-cron');
