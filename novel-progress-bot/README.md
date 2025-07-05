@@ -1,4 +1,4 @@
-claudeでつくりました。Googleスプレッドシートと連携して、discord上でタスクを追加したり、消化したりできます。<br>
+claudeでつくりました。Googleスプレッドシートと連携して、discord上で小説の進捗管理ができます。<br>
 必要なもの→discordのbot(guild id はdiscordのサーバーのIDです、client idはbotのApplication ID）、Googleスプレッドシート、Google cloud consoleのサービスアカウント<br>
 Googleスプレッドシートの例です→https://docs.google.com/spreadsheets/d/1S-wInJEbOkYO9Eo3jBlfSJxZTPpLBEVuXyuBocti9js/edit?usp=sharing<br>
 🏆 完成した機能一覧<br>
