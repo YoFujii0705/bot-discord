@@ -1,3 +1,9 @@
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+# 他のimport文
 import discord
 from discord.ext import commands, tasks
 import gspread
