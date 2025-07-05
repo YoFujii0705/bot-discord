@@ -302,6 +302,8 @@ const tarotBot = new TarotBot();
 // Botの準備完了
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
+  console.log(`Bot ID: ${client.user.id}`);
+  console.log(`Bot can be DMed: ${client.user.bot}`);
   
   // データ読み込みをリトライ機能付きで実行
   let retries = 3;
@@ -311,6 +313,7 @@ client.once('ready', async () => {
     
     if (cardsLoaded && spreadsLoaded) {
       console.log('Enhanced Tarot Bot is ready!');
+      console.log('🔹 Ready to receive DMs and server messages');
       break;
     }
     
