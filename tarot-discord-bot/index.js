@@ -1,4 +1,3 @@
-require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const { google } = require('googleapis');
 const express = require('express');
@@ -63,7 +62,7 @@ class TarotBot {
         spreadsheetId: SPREADSHEET_ID,
         range: 'Cards!A:D', // D列（意味）も取得
       });
-
+      
       const rows = response.data.values;
       if (rows && rows.length > 1) {
         this.cards = rows.slice(1).map(row => ({
@@ -89,7 +88,7 @@ class TarotBot {
         spreadsheetId: SPREADSHEET_ID,
         range: 'Spreads!A:K',
       });
-
+      
       const rows = response.data.values;
       if (rows && rows.length > 1) {
         rows.slice(1).forEach(row => {
@@ -111,18 +110,18 @@ class TarotBot {
   selectRandomCards(count) {
     const selectedCards = [];
     const availableCards = [...this.cards];
-
+    
     for (let i = 0; i < count && availableCards.length > 0; i++) {
       const randomIndex = Math.floor(Math.random() * availableCards.length);
       const card = availableCards.splice(randomIndex, 1)[0];
       const isReversed = Math.random() < 0.5;
-
+      
       selectedCards.push({
         ...card,
         position: isReversed ? '逆位置' : '正位置'
       });
     }
-
+    
     return selectedCards;
   }
 
@@ -134,7 +133,7 @@ class TarotBot {
 
     const positions = this.spreads[spreadName];
     const selectedCards = this.selectRandomCards(positions.length);
-
+    
     const reading = {
       spread: spreadName,
       question: question,
@@ -148,7 +147,7 @@ class TarotBot {
 
     // 結果をGoogle Sheetsに保存
     await this.saveReading(reading);
-
+    
     return reading;
   }
 
@@ -158,7 +157,7 @@ class TarotBot {
       const resultText = reading.results
         .map(r => `${r.position}:${r.card.name}(${r.card.position})`)
         .join(', ');
-
+      
       const row = [
         reading.timestamp,
         reading.userId,
@@ -187,7 +186,7 @@ class TarotBot {
         spreadsheetId: SPREADSHEET_ID,
         range: 'Readings!A:E',
       });
-
+      
       const rows = response.data.values;
       if (!rows || rows.length <= 1) {
         return [];
@@ -223,13 +222,13 @@ class TarotBot {
     };
 
     let message = `🔮 **${spreadNames[reading.spread] || reading.spread}** - ${reading.question}\n\n`;
-
+    
     // 二択スプレッドの場合は特別なフォーマット
     if (reading.spread === 'nitaku') {
       message += `**🌟 現在の状況**\n`;
       message += `${reading.results[0].card.name}（${reading.results[0].card.position}）\n`;
       message += `　└ *${reading.results[0].card.meaning}*\n\n`;
-
+      
       message += `**🅰️ 選択肢A**\n`;
       message += `**現状**: ${reading.results[1].card.name}（${reading.results[1].card.position}）\n`;
       message += `　└ *${reading.results[1].card.meaning}*\n`;
@@ -237,7 +236,7 @@ class TarotBot {
       message += `　└ *${reading.results[2].card.meaning}*\n`;
       message += `**最終結果**: ${reading.results[3].card.name}（${reading.results[3].card.position}）\n`;
       message += `　└ *${reading.results[3].card.meaning}*\n\n`;
-
+      
       message += `**🅱️ 選択肢B**\n`;
       message += `**現状**: ${reading.results[4].card.name}（${reading.results[4].card.position}）\n`;
       message += `　└ *${reading.results[4].card.meaning}*\n`;
@@ -245,7 +244,7 @@ class TarotBot {
       message += `　└ *${reading.results[5].card.meaning}*\n`;
       message += `**最終結果**: ${reading.results[6].card.name}（${reading.results[6].card.position}）\n`;
       message += `　└ *${reading.results[6].card.meaning}*\n\n`;
-
+      
       message += `**💡 アドバイス**\n`;
       message += `${reading.results[7].card.name}（${reading.results[7].card.position}）\n`;
       message += `　└ *${reading.results[7].card.meaning}*\n\n`;
@@ -256,9 +255,9 @@ class TarotBot {
         message += `　└ *${result.card.meaning}*\n\n`;
       });
     }
-
+    
     message += `質問: ${reading.question}`;
-
+    
     return message;
   }
 
@@ -269,7 +268,7 @@ class TarotBot {
     }
 
     let message = `📋 **占い履歴**（最新${history.length}件）\n\n`;
-
+    
     history.forEach((record, index) => {
       const date = new Date(record.timestamp).toLocaleString('ja-JP', {
         timeZone: 'Asia/Tokyo',
@@ -279,14 +278,14 @@ class TarotBot {
         hour: '2-digit',
         minute: '2-digit'
       });
-
+      
       const spreadNames = {
         'celt': 'ケルト十字',
         'three': 'スリーカード',
         'one': 'ワンカード',
         'kantan': 'かんたん'
       };
-
+      
       message += `**${index + 1}.** ${date}\n`;
       message += `　${spreadNames[record.spread] || record.spread} - ${record.question}\n\n`;
     });
@@ -301,23 +300,23 @@ const tarotBot = new TarotBot();
 // Botの準備完了
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
-
+  
   // データ読み込みをリトライ機能付きで実行
   let retries = 3;
   while (retries > 0) {
     const cardsLoaded = await tarotBot.loadCards();
     const spreadsLoaded = await tarotBot.loadSpreads();
-
+    
     if (cardsLoaded && spreadsLoaded) {
       console.log('Enhanced Tarot Bot is ready!');
       break;
     }
-
+    
     retries--;
     console.log(`Retrying data load... (${retries} attempts left)`);
     await new Promise(resolve => setTimeout(resolve, 5000));
   }
-
+  
   if (retries === 0) {
     console.error('Failed to load data after 3 attempts');
   }
@@ -334,15 +333,26 @@ process.on('unhandledRejection', (error) => {
 
 // メッセージ処理
 client.on('messageCreate', async (message) => {
+  // 全てのメッセージをログ出力（デバッグ用）
+  console.log(`📨 Message received: ${message.author.tag} | Channel Type: ${message.channel.type} | Content: "${message.content}"`);
+  
   // Bot自身のメッセージは無視
-  if (message.author.bot) return;
-
+  if (message.author.bot) {
+    console.log(`🤖 Ignored bot message`);
+    return;
+  }
+  
   // DMかサーバーかを判定
   const isDM = message.channel.type === 1; // 1 = DM
   const locationInfo = isDM ? 'DM' : `Server: ${message.guild?.name}`;
-
+  
+  console.log(`📍 Location: ${locationInfo}`);
+  
   // !divineで始まらないメッセージは無視
-  if (!message.content.startsWith('!divine')) return;
+  if (!message.content.startsWith('!divine')) {
+    console.log(`❌ Not a !divine command`);
+    return;
+  }
 
   console.log(`🔮 Command from ${message.author.tag} in ${locationInfo}: ${message.content}`);
 
@@ -420,26 +430,26 @@ client.on('messageCreate', async (message) => {
       case 'kantan':
       case 'nitaku': // 新しいスプレッド追加
         const question = args.slice(2).join(' ') || '質問なし';
-
+        
         if (tarotBot.cards.length === 0) {
           await message.reply('❌ カードデータの読み込み中です。少し待ってから再試行してください。');
           return;
         }
 
         const reading = await tarotBot.performReading(command, question, userId);
-
+        
         if (!reading) {
           await message.reply('❌ 指定されたスプレッドが見つかりません。');
           return;
         }
 
         const formattedResult = tarotBot.formatReading(reading);
-
+        
         // メッセージが長すぎる場合は分割
         if (formattedResult.length > 2000) {
           const lines = formattedResult.split('\n');
           let currentMessage = '';
-
+          
           for (const line of lines) {
             if (currentMessage.length + line.length > 1900) {
               await message.reply(currentMessage);
@@ -448,7 +458,7 @@ client.on('messageCreate', async (message) => {
               currentMessage += line + '\n';
             }
           }
-
+          
           if (currentMessage.trim()) {
             await message.reply(currentMessage);
           }
