@@ -1,0 +1,18 @@
+{
+  "name": "calendar-bird-bot",
+  "version": "1.0.0",
+  "description": "Discord bot that sends countdown notifications from Google Calendar events",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "googleapis": "^130.0.0",
+    "node-cron": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
