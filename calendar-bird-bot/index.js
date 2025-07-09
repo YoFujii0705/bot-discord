@@ -368,29 +368,55 @@ class CalendarBird {
   }
 
   async handleCountdownCommand(interaction) {
-    await interaction.deferReply();
+    try {
+      // 🔥 最優先でdeferReplyを呼ぶ
+      await interaction.deferReply();
+      console.log('✅ countdown deferReply完了');
 
-    const subcommand = interaction.options.getSubcommand();
+      const subcommand = interaction.options.getSubcommand();
 
-    if (subcommand === 'test') {
-      console.log(`🔔 テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
-      await this.sendDailyNotification();
-      await interaction.editReply({ content: '✅ カウントダウン通知をテスト送信しました！' });
-    } 
-    else if (subcommand === 'weekly-test') {
-      console.log(`📅 週間予定テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
-      await this.sendWeeklySchedule();
-      await interaction.editReply({ content: '✅ 週間予定通知をテスト送信しました！' });
-    }
-    else if (subcommand === 'toggle') {
-      await this.handleToggleCommand(interaction);
-    }
-    else if (subcommand === 'list') {
-      await this.handleListCommand(interaction);
+      if (subcommand === 'test') {
+        console.log(`🔔 テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
+        await this.sendDailyNotification();
+        await interaction.editReply({ content: '✅ カウントダウン通知をテスト送信しました！' });
+      } 
+      else if (subcommand === 'weekly-test') {
+        console.log(`📅 週間予定テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
+        await this.sendWeeklySchedule();
+        await interaction.editReply({ content: '✅ 週間予定通知をテスト送信しました！' });
+      }
+      else if (subcommand === 'toggle') {
+        await this.handleToggleCommand(interaction);
+      }
+      else if (subcommand === 'list') {
+        await this.handleListCommand(interaction);
+      }
+
+    } catch (error) {
+      console.error('Countdown コマンドエラー:', error);
+
+      try {
+        await interaction.editReply({ 
+          content: `❌ エラーが発生しました: ${error.message}` 
+        });
+        console.log('✅ countdown エラー応答送信完了');
+      } catch (replyError) {
+        console.error('countdown 返信エラー:', replyError);
+        
+        try {
+          await interaction.followUp({ 
+            content: `❌ エラーが発生しました: ${error.message}` 
+          });
+          console.log('✅ countdown フォローアップ送信完了');
+        } catch (followUpError) {
+          console.error('countdown フォローアップエラー:', followUpError);
+        }
+      }
     }
   }
 
   async handleToggleCommand(interaction) {
+    // 🔥 interaction は既に handleCountdownCommand で deferReply 済み
     const keyword = interaction.options.getString('keyword');
 
     try {
@@ -502,6 +528,7 @@ class CalendarBird {
   }
 
   async handleListCommand(interaction) {
+    // 🔥 interaction は既に handleCountdownCommand で deferReply 済み
     const days = interaction.options.getInteger('days') || 30;
 
     try {
@@ -529,6 +556,8 @@ class CalendarBird {
       const itemsPerPage = 15;
       const totalPages = Math.ceil(allEvents.length / itemsPerPage);
       let currentPage = 0;
+
+      console.log(`📖 総ページ数: ${totalPages}, 総予定数: ${allEvents.length}`); // 🔥 デバッグログ追加
 
       const generateEmbed = (page) => {
         const start = page * itemsPerPage;
@@ -599,6 +628,8 @@ class CalendarBird {
           });
         }
 
+        console.log(`🔘 ボタン生成: ページ${page + 1}/${totalPages}, ボタン数: ${row.length}`); // 🔥 デバッグログ
+
         return row.length > 0 ? [{
           type: 1,
           components: row
@@ -614,10 +645,13 @@ class CalendarBird {
         components: initialComponents
       });
 
-      // 1ページしかない場合はボタン操作不要
-      if (totalPages <= 1) return;
+      // 🔥 1ページしかない場合はコレクター設定不要
+      if (totalPages <= 1) {
+        console.log('📄 1ページのみなので、ボタンコレクターは設定しません');
+        return;
+      }
 
-      // ボタン操作のコレクター
+      // ボタン操作のコレクター（複数ページの場合のみ）
       const collector = reply.createMessageComponentCollector({ 
         time: 300000 // 5分間
       });
