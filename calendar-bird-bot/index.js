@@ -385,14 +385,20 @@ class CalendarBird {
       console.error('Countdown コマンドエラー:', error);
 
       try {
-        if (!interaction.replied) {
+        // 🔥 interaction の状態をチェックして適切な応答方法を選択
+        if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: `❌ エラーが発生しました: ${error.message}` });
-        } else {
+        } else if (interaction.deferred && !interaction.replied) {
           await interaction.editReply({ content: `❌ エラーが発生しました: ${error.message}` });
+        } else {
+          // 既に応答済みの場合はfollowUpを使用
+          await interaction.followUp({ content: `❌ エラーが発生しました: ${error.message}` });
         }
         console.log('✅ countdown エラー応答送信完了');
       } catch (replyError) {
         console.error('countdown 返信エラー:', replyError);
+        // 🔥 最後の手段としてコンソールログのみ出力（Discord応答は諦める）
+        console.log('⚠️ Discord応答は送信できませんでしたが、処理は完了しています');
       }
     }
   }
