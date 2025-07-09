@@ -129,13 +129,12 @@ class CalendarBird {
         } else if (commandName === 'ping') {
           const jstNow = this.formatJSTDate(new Date(), true);
           await interaction.reply({ 
-            content: `🏓 Pong! Botは正常に動作しています。\n🕐 現在の日本時間: ${jstNow}`, 
-            ephemeral: false 
+            content: `🏓 Pong! Botは正常に動作しています。\n🕐 現在の日本時間: ${jstNow}`
           });
         }
       } catch (error) {
         console.error('コマンド実行エラー:', error);
-        const reply = { content: `エラーが発生しました: ${error.message}`, ephemeral: false };
+        const reply = { content: `エラーが発生しました: ${error.message}` };
 
         try {
           if (interaction.replied || interaction.deferred) {
@@ -153,46 +152,47 @@ class CalendarBird {
   async handleScheduleCommand(interaction) {
     if (interaction.options.getSubcommand() !== 'add') return;
 
-    try {
-      // 🔥 最初に即座にdeferReplyを呼ぶ
-      await interaction.deferReply({ ephemeral: false });
+    // 🔥 オプションを最初に取得
+    const title = interaction.options.getString('title');
+    const date = interaction.options.getString('date');
+    const time = interaction.options.getString('time') || '17:00';
+    const endTime = interaction.options.getString('endtime');
+    const planned = interaction.options.getString('planned');
+    const isAllDay = interaction.options.getBoolean('allday') || false;
+    const countdownEnabled = interaction.options.getBoolean('countdown') ?? true;
+    const description = interaction.options.getString('description') || '';
 
-      const title = interaction.options.getString('title');
-      const date = interaction.options.getString('date');
-      const time = interaction.options.getString('time') || '17:00';
-      const endTime = interaction.options.getString('endtime');
-      const planned = interaction.options.getString('planned');
-      const isAllDay = interaction.options.getBoolean('allday') || false;
-      const countdownEnabled = interaction.options.getBoolean('countdown') ?? true;
-      const description = interaction.options.getString('description') || '';
+    // 🔥 バリデーションを最初に実行
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      await interaction.reply({ content: '❌ 日付の形式が正しくありません。YYYY-MM-DD形式で入力してください。' });
+      return;
+    }
+
+    if (planned && !dateRegex.test(planned)) {
+      await interaction.reply({ content: '❌ 想定締切日の形式が正しくありません。YYYY-MM-DD形式で入力してください。' });
+      return;
+    }
+
+    if (!isAllDay) {
+      const timeRegex = /^\d{2}:\d{2}$/;
+      if (!timeRegex.test(time)) {
+        await interaction.reply({ content: '❌ 開始時刻の形式が正しくありません。HH:MM形式で入力してください。' });
+        return;
+      }
+
+      if (endTime && !timeRegex.test(endTime)) {
+        await interaction.reply({ content: '❌ 終了時刻の形式が正しくありません。HH:MM形式で入力してください。' });
+        return;
+      }
+    }
+
+    try {
+      // 🔥 バリデーション後にdeferReplyを呼ぶ
+      await interaction.deferReply();
 
       console.log(`📅 予定作成開始 (JST: ${this.formatJSTDate(new Date(), true)})`);
       console.log('オプション:', { title, date, time, endTime, planned, isAllDay, countdownEnabled });
-
-      // バリデーション
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(date)) {
-        await interaction.editReply({ content: '❌ 日付の形式が正しくありません。YYYY-MM-DD形式で入力してください。' });
-        return;
-      }
-
-      if (planned && !dateRegex.test(planned)) {
-        await interaction.editReply({ content: '❌ 想定締切日の形式が正しくありません。YYYY-MM-DD形式で入力してください。' });
-        return;
-      }
-
-      if (!isAllDay) {
-        const timeRegex = /^\d{2}:\d{2}$/;
-        if (!timeRegex.test(time)) {
-          await interaction.editReply({ content: '❌ 開始時刻の形式が正しくありません。HH:MM形式で入力してください。' });
-          return;
-        }
-
-        if (endTime && !timeRegex.test(endTime)) {
-          await interaction.editReply({ content: '❌ 終了時刻の形式が正しくありません。HH:MM形式で入力してください。' });
-          return;
-        }
-      }
 
       let event;
 
@@ -343,7 +343,7 @@ class CalendarBird {
   }
 
   async handleCountdownCommand(interaction) {
-    await interaction.deferReply({ ephemeral: false });
+    await interaction.deferReply();
 
     const subcommand = interaction.options.getSubcommand();
 
@@ -466,7 +466,7 @@ class CalendarBird {
 
       collector.on('end', (collected) => {
         if (collected.size === 0) {
-          interaction.followUp({ content: '⏰ 時間切れです。再度コマンドを実行してください。', ephemeral: false });
+          interaction.followUp({ content: '⏰ 時間切れです。再度コマンドを実行してください。' });
         }
       });
 
