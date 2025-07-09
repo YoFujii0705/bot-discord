@@ -15,9 +15,6 @@ const CONFIG = {
 class CalendarBird {
   constructor() {
     console.log('🤖 CalendarBird 初期化中...');
-    
-    // 🔥 環境変数のデバッグ情報を追加
-    this.debugEnvironmentVariables();
 
     this.client = new Client({ 
       intents: [
@@ -47,17 +44,6 @@ class CalendarBird {
 
     this.setupEventHandlers();
     this.setupCommandHandlers();
-  }
-
-  // 🔥 環境変数のデバッグ関数を追加
-  debugEnvironmentVariables() {
-    console.log('🔍 環境変数確認:');
-    console.log('DISCORD_TOKEN:', CONFIG.DISCORD_TOKEN ? '設定済み' : '❌ 未設定');
-    console.log('DISCORD_CLIENT_ID:', CONFIG.DISCORD_CLIENT_ID ? '設定済み' : '❌ 未設定');
-    console.log('GOOGLE_CALENDAR_ID:', CONFIG.GOOGLE_CALENDAR_ID ? '設定済み' : '❌ 未設定');
-    console.log('SERVICE_ACCOUNT_EMAIL:', CONFIG.SERVICE_ACCOUNT_EMAIL ? '設定済み' : '❌ 未設定');
-    console.log('SERVICE_ACCOUNT_PRIVATE_KEY:', CONFIG.SERVICE_ACCOUNT_PRIVATE_KEY ? `設定済み(${CONFIG.SERVICE_ACCOUNT_PRIVATE_KEY.length}文字)` : '❌ 未設定');
-    console.log('NOTIFICATION_CHANNEL_ID:', CONFIG.NOTIFICATION_CHANNEL_ID ? '設定済み' : '❌ 未設定');
   }
 
   // 正確な日本時間を取得
@@ -133,7 +119,6 @@ class CalendarBird {
       if (!interaction.isChatInputCommand()) return;
 
       const { commandName } = interaction;
-      const startTime = Date.now(); // 🔥 応答時間測定を追加
       console.log(`コマンド受信: ${commandName} (JST: ${this.formatJSTDate(new Date(), true)})`);
 
       try {
@@ -143,9 +128,8 @@ class CalendarBird {
           await this.handleCountdownCommand(interaction);
         } else if (commandName === 'ping') {
           const jstNow = this.formatJSTDate(new Date(), true);
-          const responseTime = Date.now() - startTime; // 🔥 応答時間計算
           await interaction.reply({ 
-            content: `🏓 Pong! Botは正常に動作しています。\n🕐 現在の日本時間: ${jstNow}\n⏱️ 応答時間: ${responseTime}ms`, 
+            content: `🏓 Pong! Botは正常に動作しています。\n🕐 現在の日本時間: ${jstNow}`, 
             ephemeral: false 
           });
         }
@@ -166,32 +150,12 @@ class CalendarBird {
     });
   }
 
-  // 🔥 Google Calendar API呼び出しにタイムアウト対策を追加
-  async callCalendarAPIWithTimeout(apiCall, timeoutMs = 15000) {
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Google Calendar API タイムアウト')), timeoutMs)
-    );
-
-    try {
-      return await Promise.race([apiCall, timeoutPromise]);
-    } catch (error) {
-      if (error.message === 'Google Calendar API タイムアウト') {
-        console.error('⏰ Google Calendar API がタイムアウトしました');
-        throw new Error('Google Calendar API の応答が遅すぎます。しばらく待ってから再試行してください。');
-      }
-      throw error;
-    }
-  }
-
   async handleScheduleCommand(interaction) {
     if (interaction.options.getSubcommand() !== 'add') return;
 
     try {
-      // 🔥 即座に応答を送信
+      // 🔥 最初に即座にdeferReplyを呼ぶ
       await interaction.deferReply({ ephemeral: false });
-      
-      // 🔥 処理開始の通知
-      await interaction.editReply({ content: '📅 予定を作成中です... お待ちください。' });
 
       const title = interaction.options.getString('title');
       const date = interaction.options.getString('date');
@@ -332,13 +296,10 @@ class CalendarBird {
 
       console.log('📤 Google Calendar API 呼び出し中...');
 
-      // 🔥 タイムアウト対策を適用してGoogle Calendar API呼び出し
-      const response = await this.callCalendarAPIWithTimeout(
-        this.calendar.events.insert({
-          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-          resource: event
-        })
-      );
+      const response = await this.calendar.events.insert({
+        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+        resource: event
+      });
 
       console.log('✅ カレンダーイベント作成完了');
 
@@ -366,11 +327,7 @@ class CalendarBird {
         );
       }
 
-      // 🔥 最終的な成功メッセージを送信
-      await interaction.editReply({ 
-        content: null, // 「作成中...」メッセージを削除
-        embeds: [embed] 
-      });
+      await interaction.editReply({ embeds: [embed] });
 
     } catch (error) {
       console.error('Schedule コマンドエラー:', error);
@@ -386,20 +343,17 @@ class CalendarBird {
   }
 
   async handleCountdownCommand(interaction) {
-    // 🔥 即座に応答を送信
     await interaction.deferReply({ ephemeral: false });
 
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'test') {
       console.log(`🔔 テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
-      await interaction.editReply({ content: '🔔 カウントダウン通知をテスト送信中...' });
       await this.sendDailyNotification();
       await interaction.editReply({ content: '✅ カウントダウン通知をテスト送信しました！' });
     } 
     else if (subcommand === 'weekly-test') {
       console.log(`📅 週間予定テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
-      await interaction.editReply({ content: '📅 週間予定通知をテスト送信中...' });
       await this.sendWeeklySchedule();
       await interaction.editReply({ content: '✅ 週間予定通知をテスト送信しました！' });
     }
@@ -415,24 +369,18 @@ class CalendarBird {
     const keyword = interaction.options.getString('keyword');
 
     try {
-      // 🔥 処理中メッセージを表示
-      await interaction.editReply({ content: `🔍 "${keyword}" に一致する予定を検索中...` });
-
       const now = new Date();
       const futureDate = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
 
       console.log(`🔍 予定検索中 (JST: ${this.formatJSTDate(now)} - ${this.formatJSTDate(futureDate)})`);
 
-      // 🔥 タイムアウト対策を適用
-      const response = await this.callCalendarAPIWithTimeout(
-        this.calendar.events.list({
-          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-          timeMin: now.toISOString(),
-          timeMax: futureDate.toISOString(),
-          singleEvents: true,
-          orderBy: 'startTime'
-        })
-      );
+      const response = await this.calendar.events.list({
+        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+        timeMin: now.toISOString(),
+        timeMax: futureDate.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime'
+      });
 
       const allEvents = response.data.items || [];
 
@@ -455,7 +403,6 @@ class CalendarBird {
       }
 
       if (matchingEvents.length === 1) {
-        await interaction.editReply({ content: '🔄 カウントダウンを切り替え中...' });
         await this.toggleEventCountdown(matchingEvents[0]);
         const newStatus = await this.getEventCountdownStatus(matchingEvents[0].id);
         await interaction.editReply({ 
@@ -533,24 +480,18 @@ class CalendarBird {
     const days = interaction.options.getInteger('days') || 30;
 
     try {
-      // 🔥 処理中メッセージを表示
-      await interaction.editReply({ content: `📋 今後${days}日間の予定を取得中...` });
-
       const now = new Date();
       const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
       console.log(`📋 予定一覧取得 (JST: ${this.formatJSTDate(now)} - ${this.formatJSTDate(futureDate)})`);
 
-      // 🔥 タイムアウト対策を適用
-      const response = await this.callCalendarAPIWithTimeout(
-        this.calendar.events.list({
-          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-          timeMin: now.toISOString(),
-          timeMax: futureDate.toISOString(),
-          singleEvents: true,
-          orderBy: 'startTime'
-        })
-      );
+      const response = await this.calendar.events.list({
+        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+        timeMin: now.toISOString(),
+        timeMax: futureDate.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime'
+      });
 
       const allEvents = response.data.items || [];
 
@@ -724,28 +665,22 @@ class CalendarBird {
       }
     }
 
-    // 🔥 タイムアウト対策を適用
-    await this.callCalendarAPIWithTimeout(
-      this.calendar.events.update({
-        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-        eventId: event.id,
-        resource: {
-          ...event,
-          description: newDescription
-        }
-      })
-    );
+    await this.calendar.events.update({
+      calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+      eventId: event.id,
+      resource: {
+        ...event,
+        description: newDescription
+      }
+    });
   }
 
   async getEventCountdownStatus(eventId) {
     try {
-      // 🔥 タイムアウト対策を適用
-      const response = await this.callCalendarAPIWithTimeout(
-        this.calendar.events.get({
-          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-          eventId: eventId
-        })
-      );
+      const response = await this.calendar.events.get({
+        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+        eventId: eventId
+      });
 
       const description = response.data.description || '';
       return description.toLowerCase().includes('カウントダウン:on');
@@ -818,16 +753,13 @@ class CalendarBird {
       const now = new Date();
       const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-      // 🔥 タイムアウト対策を適用
-      const response = await this.callCalendarAPIWithTimeout(
-        this.calendar.events.list({
-          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-          timeMin: now.toISOString(),
-          timeMax: oneWeekLater.toISOString(),
-          singleEvents: true,
-          orderBy: 'startTime'
-        })
-      );
+      const response = await this.calendar.events.list({
+        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+        timeMin: now.toISOString(),
+        timeMax: oneWeekLater.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime'
+      });
 
       const events = response.data.items || [];
 
@@ -940,16 +872,13 @@ class CalendarBird {
       const now = new Date();
       const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-      // 🔥 タイムアウト対策を適用
-      const response = await this.callCalendarAPIWithTimeout(
-        this.calendar.events.list({
-          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-          timeMin: now.toISOString(),
-          timeMax: futureDate.toISOString(),
-          singleEvents: true,
-          orderBy: 'startTime'
-        })
-      );
+      const response = await this.calendar.events.list({
+        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+        timeMin: now.toISOString(),
+        timeMax: futureDate.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime'
+      });
 
       const events = response.data.items || [];
 
