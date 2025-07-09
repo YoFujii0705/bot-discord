@@ -152,47 +152,48 @@ class CalendarBird {
   async handleScheduleCommand(interaction) {
     if (interaction.options.getSubcommand() !== 'add') return;
 
-    // 🔥 オプションを最初に取得
-    const title = interaction.options.getString('title');
-    const date = interaction.options.getString('date');
-    const time = interaction.options.getString('time') || '17:00';
-    const endTime = interaction.options.getString('endtime');
-    const planned = interaction.options.getString('planned');
-    const isAllDay = interaction.options.getBoolean('allday') || false;
-    const countdownEnabled = interaction.options.getBoolean('countdown') ?? true;
-    const description = interaction.options.getString('description') || '';
-
-    // 🔥 バリデーションを最初に実行
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(date)) {
-      await interaction.reply({ content: '❌ 日付の形式が正しくありません。YYYY-MM-DD形式で入力してください。' });
-      return;
-    }
-
-    if (planned && !dateRegex.test(planned)) {
-      await interaction.reply({ content: '❌ 想定締切日の形式が正しくありません。YYYY-MM-DD形式で入力してください。' });
-      return;
-    }
-
-    if (!isAllDay) {
-      const timeRegex = /^\d{2}:\d{2}$/;
-      if (!timeRegex.test(time)) {
-        await interaction.reply({ content: '❌ 開始時刻の形式が正しくありません。HH:MM形式で入力してください。' });
-        return;
-      }
-
-      if (endTime && !timeRegex.test(endTime)) {
-        await interaction.reply({ content: '❌ 終了時刻の形式が正しくありません。HH:MM形式で入力してください。' });
-        return;
-      }
-    }
-
     try {
-      // 🔥 バリデーション後にdeferReplyを呼ぶ
+      // 🔥 最優先でdeferReplyを呼ぶ（何よりも先に！）
       await interaction.deferReply();
+      console.log('✅ deferReply完了');
+
+      // オプション取得
+      const title = interaction.options.getString('title');
+      const date = interaction.options.getString('date');
+      const time = interaction.options.getString('time') || '17:00';
+      const endTime = interaction.options.getString('endtime');
+      const planned = interaction.options.getString('planned');
+      const isAllDay = interaction.options.getBoolean('allday') || false;
+      const countdownEnabled = interaction.options.getBoolean('countdown') ?? true;
+      const description = interaction.options.getString('description') || '';
 
       console.log(`📅 予定作成開始 (JST: ${this.formatJSTDate(new Date(), true)})`);
       console.log('オプション:', { title, date, time, endTime, planned, isAllDay, countdownEnabled });
+
+      // バリデーション（deferReply後に実行）
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(date)) {
+        await interaction.editReply({ content: '❌ 日付の形式が正しくありません。YYYY-MM-DD形式で入力してください。' });
+        return;
+      }
+
+      if (planned && !dateRegex.test(planned)) {
+        await interaction.editReply({ content: '❌ 想定締切日の形式が正しくありません。YYYY-MM-DD形式で入力してください。' });
+        return;
+      }
+
+      if (!isAllDay) {
+        const timeRegex = /^\d{2}:\d{2}$/;
+        if (!timeRegex.test(time)) {
+          await interaction.editReply({ content: '❌ 開始時刻の形式が正しくありません。HH:MM形式で入力してください。' });
+          return;
+        }
+
+        if (endTime && !timeRegex.test(endTime)) {
+          await interaction.editReply({ content: '❌ 終了時刻の形式が正しくありません。HH:MM形式で入力してください。' });
+          return;
+        }
+      }
 
       let event;
 
@@ -345,19 +346,23 @@ class CalendarBird {
       console.error('Schedule コマンドエラー:', error);
 
       try {
-        // 🔥 エラー応答も確実に送信
-        if (interaction.deferred && !interaction.replied) {
-          await interaction.editReply({ 
-            content: `❌ エラーが発生しました: ${error.message}` 
-          });
-        } else if (!interaction.replied) {
-          await interaction.reply({ 
-            content: `❌ エラーが発生しました: ${error.message}` 
-          });
-        }
+        // 🔥 deferReplyが成功していれば editReply を使用
+        await interaction.editReply({ 
+          content: `❌ エラーが発生しました: ${error.message}` 
+        });
         console.log('✅ エラー応答送信完了');
       } catch (replyError) {
         console.error('返信エラー:', replyError);
+        
+        // 🔥 最後の手段として followUp を試す
+        try {
+          await interaction.followUp({ 
+            content: `❌ エラーが発生しました: ${error.message}` 
+          });
+          console.log('✅ フォローアップ送信完了');
+        } catch (followUpError) {
+          console.error('フォローアップエラー:', followUpError);
+        }
       }
     }
   }
