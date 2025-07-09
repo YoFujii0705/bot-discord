@@ -15,6 +15,9 @@ const CONFIG = {
 class CalendarBird {
   constructor() {
     console.log('🤖 CalendarBird 初期化中...');
+    
+    // 🔥 環境変数のデバッグ情報を追加
+    this.debugEnvironmentVariables();
 
     this.client = new Client({ 
       intents: [
@@ -44,6 +47,17 @@ class CalendarBird {
 
     this.setupEventHandlers();
     this.setupCommandHandlers();
+  }
+
+  // 🔥 環境変数のデバッグ関数を追加
+  debugEnvironmentVariables() {
+    console.log('🔍 環境変数確認:');
+    console.log('DISCORD_TOKEN:', CONFIG.DISCORD_TOKEN ? '設定済み' : '❌ 未設定');
+    console.log('DISCORD_CLIENT_ID:', CONFIG.DISCORD_CLIENT_ID ? '設定済み' : '❌ 未設定');
+    console.log('GOOGLE_CALENDAR_ID:', CONFIG.GOOGLE_CALENDAR_ID ? '設定済み' : '❌ 未設定');
+    console.log('SERVICE_ACCOUNT_EMAIL:', CONFIG.SERVICE_ACCOUNT_EMAIL ? '設定済み' : '❌ 未設定');
+    console.log('SERVICE_ACCOUNT_PRIVATE_KEY:', CONFIG.SERVICE_ACCOUNT_PRIVATE_KEY ? `設定済み(${CONFIG.SERVICE_ACCOUNT_PRIVATE_KEY.length}文字)` : '❌ 未設定');
+    console.log('NOTIFICATION_CHANNEL_ID:', CONFIG.NOTIFICATION_CHANNEL_ID ? '設定済み' : '❌ 未設定');
   }
 
   // 正確な日本時間を取得
@@ -119,6 +133,7 @@ class CalendarBird {
       if (!interaction.isChatInputCommand()) return;
 
       const { commandName } = interaction;
+      const startTime = Date.now(); // 🔥 応答時間測定を追加
       console.log(`コマンド受信: ${commandName} (JST: ${this.formatJSTDate(new Date(), true)})`);
 
       try {
@@ -128,8 +143,9 @@ class CalendarBird {
           await this.handleCountdownCommand(interaction);
         } else if (commandName === 'ping') {
           const jstNow = this.formatJSTDate(new Date(), true);
+          const responseTime = Date.now() - startTime; // 🔥 応答時間計算
           await interaction.reply({ 
-            content: `🏓 Pong! Botは正常に動作しています。\n🕐 現在の日本時間: ${jstNow}`, 
+            content: `🏓 Pong! Botは正常に動作しています。\n🕐 現在の日本時間: ${jstNow}\n⏱️ 応答時間: ${responseTime}ms`, 
             ephemeral: false 
           });
         }
@@ -150,11 +166,32 @@ class CalendarBird {
     });
   }
 
+  // 🔥 Google Calendar API呼び出しにタイムアウト対策を追加
+  async callCalendarAPIWithTimeout(apiCall, timeoutMs = 15000) {
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Google Calendar API タイムアウト')), timeoutMs)
+    );
+
+    try {
+      return await Promise.race([apiCall, timeoutPromise]);
+    } catch (error) {
+      if (error.message === 'Google Calendar API タイムアウト') {
+        console.error('⏰ Google Calendar API がタイムアウトしました');
+        throw new Error('Google Calendar API の応答が遅すぎます。しばらく待ってから再試行してください。');
+      }
+      throw error;
+    }
+  }
+
   async handleScheduleCommand(interaction) {
     if (interaction.options.getSubcommand() !== 'add') return;
 
     try {
+      // 🔥 即座に応答を送信
       await interaction.deferReply({ ephemeral: false });
+      
+      // 🔥 処理開始の通知
+      await interaction.editReply({ content: '📅 予定を作成中です... お待ちください。' });
 
       const title = interaction.options.getString('title');
       const date = interaction.options.getString('date');
@@ -295,10 +332,13 @@ class CalendarBird {
 
       console.log('📤 Google Calendar API 呼び出し中...');
 
-      const response = await this.calendar.events.insert({
-        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-        resource: event
-      });
+      // 🔥 タイムアウト対策を適用してGoogle Calendar API呼び出し
+      const response = await this.callCalendarAPIWithTimeout(
+        this.calendar.events.insert({
+          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+          resource: event
+        })
+      );
 
       console.log('✅ カレンダーイベント作成完了');
 
@@ -326,7 +366,11 @@ class CalendarBird {
         );
       }
 
-      await interaction.editReply({ embeds: [embed] });
+      // 🔥 最終的な成功メッセージを送信
+      await interaction.editReply({ 
+        content: null, // 「作成中...」メッセージを削除
+        embeds: [embed] 
+      });
 
     } catch (error) {
       console.error('Schedule コマンドエラー:', error);
@@ -342,17 +386,20 @@ class CalendarBird {
   }
 
   async handleCountdownCommand(interaction) {
+    // 🔥 即座に応答を送信
     await interaction.deferReply({ ephemeral: false });
 
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'test') {
       console.log(`🔔 テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
+      await interaction.editReply({ content: '🔔 カウントダウン通知をテスト送信中...' });
       await this.sendDailyNotification();
       await interaction.editReply({ content: '✅ カウントダウン通知をテスト送信しました！' });
     } 
     else if (subcommand === 'weekly-test') {
       console.log(`📅 週間予定テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
+      await interaction.editReply({ content: '📅 週間予定通知をテスト送信中...' });
       await this.sendWeeklySchedule();
       await interaction.editReply({ content: '✅ 週間予定通知をテスト送信しました！' });
     }
@@ -368,18 +415,24 @@ class CalendarBird {
     const keyword = interaction.options.getString('keyword');
 
     try {
+      // 🔥 処理中メッセージを表示
+      await interaction.editReply({ content: `🔍 "${keyword}" に一致する予定を検索中...` });
+
       const now = new Date();
       const futureDate = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
 
       console.log(`🔍 予定検索中 (JST: ${this.formatJSTDate(now)} - ${this.formatJSTDate(futureDate)})`);
 
-      const response = await this.calendar.events.list({
-        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-        timeMin: now.toISOString(),
-        timeMax: futureDate.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime'
-      });
+      // 🔥 タイムアウト対策を適用
+      const response = await this.callCalendarAPIWithTimeout(
+        this.calendar.events.list({
+          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+          timeMin: now.toISOString(),
+          timeMax: futureDate.toISOString(),
+          singleEvents: true,
+          orderBy: 'startTime'
+        })
+      );
 
       const allEvents = response.data.items || [];
 
@@ -402,6 +455,7 @@ class CalendarBird {
       }
 
       if (matchingEvents.length === 1) {
+        await interaction.editReply({ content: '🔄 カウントダウンを切り替え中...' });
         await this.toggleEventCountdown(matchingEvents[0]);
         const newStatus = await this.getEventCountdownStatus(matchingEvents[0].id);
         await interaction.editReply({ 
@@ -479,18 +533,24 @@ class CalendarBird {
     const days = interaction.options.getInteger('days') || 30;
 
     try {
+      // 🔥 処理中メッセージを表示
+      await interaction.editReply({ content: `📋 今後${days}日間の予定を取得中...` });
+
       const now = new Date();
       const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
       console.log(`📋 予定一覧取得 (JST: ${this.formatJSTDate(now)} - ${this.formatJSTDate(futureDate)})`);
 
-      const response = await this.calendar.events.list({
-        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-        timeMin: now.toISOString(),
-        timeMax: futureDate.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime'
-      });
+      // 🔥 タイムアウト対策を適用
+      const response = await this.callCalendarAPIWithTimeout(
+        this.calendar.events.list({
+          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+          timeMin: now.toISOString(),
+          timeMax: futureDate.toISOString(),
+          singleEvents: true,
+          orderBy: 'startTime'
+        })
+      );
 
       const allEvents = response.data.items || [];
 
@@ -664,22 +724,28 @@ class CalendarBird {
       }
     }
 
-    await this.calendar.events.update({
-      calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-      eventId: event.id,
-      resource: {
-        ...event,
-        description: newDescription
-      }
-    });
+    // 🔥 タイムアウト対策を適用
+    await this.callCalendarAPIWithTimeout(
+      this.calendar.events.update({
+        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+        eventId: event.id,
+        resource: {
+          ...event,
+          description: newDescription
+        }
+      })
+    );
   }
 
   async getEventCountdownStatus(eventId) {
     try {
-      const response = await this.calendar.events.get({
-        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-        eventId: eventId
-      });
+      // 🔥 タイムアウト対策を適用
+      const response = await this.callCalendarAPIWithTimeout(
+        this.calendar.events.get({
+          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+          eventId: eventId
+        })
+      );
 
       const description = response.data.description || '';
       return description.toLowerCase().includes('カウントダウン:on');
@@ -718,370 +784,376 @@ class CalendarBird {
         console.log(`✅ 週間予定通知送信完了`);
       } else {
         console.log(`⏭️ 本日(${today})は既に週間予定通知済みです`);
-            }
-          }, {
-            timezone: 'Asia/Tokyo'
-          });
+      }
+    }, {
+      timezone: 'Asia/Tokyo'
+    });
 
-          // 毎朝7時30分：カウントダウン通知を送信
-          cron.schedule('30 7 * * *', async () => {
-            const now = new Date();
-            const jstTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
-            const today = this.formatJSTDateOnly(jstTime);
+    // 毎朝7時30分：カウントダウン通知を送信
+    cron.schedule('30 7 * * *', async () => {
+      const now = new Date();
+      const jstTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
+      const today = this.formatJSTDateOnly(jstTime);
 
-            // 今日まだ送信していない場合のみ実行
-            if (this.lastCountdownDate !== today) {
-              console.log(`🔔 カウントダウン通知の時間です (JST: ${this.formatJSTDate(jstTime, true)})`);
-              await this.sendDailyNotification();
-              this.lastCountdownDate = today;
-              console.log(`✅ カウントダウン通知送信完了`);
-            } else {
-              console.log(`⏭️ 本日(${today})は既にカウントダウン通知済みです`);
-            }
-          }, {
-            timezone: 'Asia/Tokyo'
-          });
+      // 今日まだ送信していない場合のみ実行
+      if (this.lastCountdownDate !== today) {
+        console.log(`🔔 カウントダウン通知の時間です (JST: ${this.formatJSTDate(jstTime, true)})`);
+        await this.sendDailyNotification();
+        this.lastCountdownDate = today;
+        console.log(`✅ カウントダウン通知送信完了`);
+      } else {
+        console.log(`⏭️ 本日(${today})は既にカウントダウン通知済みです`);
+      }
+    }, {
+      timezone: 'Asia/Tokyo'
+    });
 
-          console.log('✅ Cronジョブが設定されました（毎朝7:00に週間予定、7:30にカウントダウン通知 JST）');
+    console.log('✅ Cronジョブが設定されました（毎朝7:00に週間予定、7:30にカウントダウン通知 JST）');
+  }
+
+  async sendWeeklySchedule() {
+    try {
+      console.log(`📅 週間予定通知準備中... (JST: ${this.formatJSTDate(new Date(), true)})`);
+
+      const now = new Date();
+      const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      // 🔥 タイムアウト対策を適用
+      const response = await this.callCalendarAPIWithTimeout(
+        this.calendar.events.list({
+          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+          timeMin: now.toISOString(),
+          timeMax: oneWeekLater.toISOString(),
+          singleEvents: true,
+          orderBy: 'startTime'
+        })
+      );
+
+      const events = response.data.items || [];
+
+      if (events.length === 0) {
+        const embed = new EmbedBuilder()
+          .setTitle('📅 今週の予定')
+          .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}\n\n📭 今後一週間の予定がありません。`)
+          .setColor('#808080')
+          .setTimestamp();
+
+        const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
+        if (channel) {
+          await channel.send({ embeds: [embed] });
+          console.log('✅ 週間予定通知（予定なし）を送信しました');
         }
+        return;
+      }
 
-        async sendWeeklySchedule() {
-          try {
-            console.log(`📅 週間予定通知準備中... (JST: ${this.formatJSTDate(new Date(), true)})`);
+      // 日付別にグループ化
+      const eventsByDate = {};
+      events.forEach(event => {
+        const startTime = new Date(event.start.dateTime || event.start.date);
+        const dateKey = this.formatJSTDateOnly(startTime);
 
-            const now = new Date();
-            const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        if (!eventsByDate[dateKey]) {
+          eventsByDate[dateKey] = [];
+        }
+        eventsByDate[dateKey].push(event);
+      });
 
-            const response = await this.calendar.events.list({
-              calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-              timeMin: now.toISOString(),
-              timeMax: oneWeekLater.toISOString(),
-              singleEvents: true,
-              orderBy: 'startTime'
-            });
+      const embed = new EmbedBuilder()
+        .setTitle('📅 今週の予定一覧')
+        .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}\n📊 全${events.length}件の予定`)
+        .setColor('#4169E1')
+        .setTimestamp();
 
-            const events = response.data.items || [];
+      // 日付順に表示
+      const sortedDates = Object.keys(eventsByDate).sort();
+      let totalDisplayed = 0;
+      const maxEventsPerDay = 10;
+      const maxTotalEvents = 20;
 
-            if (events.length === 0) {
-              const embed = new EmbedBuilder()
-                .setTitle('📅 今週の予定')
-                .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}\n\n📭 今後一週間の予定がありません。`)
-                .setColor('#808080')
-                .setTimestamp();
+      for (const date of sortedDates) {
+        if (totalDisplayed >= maxTotalEvents) break;
 
-              const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
-              if (channel) {
-                await channel.send({ embeds: [embed] });
-                console.log('✅ 週間予定通知（予定なし）を送信しました');
-              }
-              return;
-            }
+        const dayEvents = eventsByDate[date];
+        const displayEvents = dayEvents.slice(0, maxEventsPerDay);
 
-            // 日付別にグループ化
-            const eventsByDate = {};
-            events.forEach(event => {
-              const startTime = new Date(event.start.dateTime || event.start.date);
-              const dateKey = this.formatJSTDateOnly(startTime);
+        // 曜日を取得
+        const dayOfWeek = new Date(date + 'T00:00:00').toLocaleDateString('ja-JP', { 
+          weekday: 'short',
+          timeZone: 'Asia/Tokyo'
+        });
 
-              if (!eventsByDate[dateKey]) {
-                eventsByDate[dateKey] = [];
-              }
-              eventsByDate[dateKey].push(event);
-            });
+        let dayText = '';
+        displayEvents.forEach(event => {
+          if (totalDisplayed >= maxTotalEvents) return;
 
-            const embed = new EmbedBuilder()
-              .setTitle('📅 今週の予定一覧')
-              .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}\n📊 全${events.length}件の予定`)
-              .setColor('#4169E1')
-              .setTimestamp();
+          const description = event.description || '';
+          const isCountdownOn = description.toLowerCase().includes('カウントダウン:on');
+          const status = isCountdownOn ? '🟢' : '⚪';
 
-            // 日付順に表示
-            const sortedDates = Object.keys(eventsByDate).sort();
-            let totalDisplayed = 0;
-            const maxEventsPerDay = 10;
-            const maxTotalEvents = 20;
-
-            for (const date of sortedDates) {
-              if (totalDisplayed >= maxTotalEvents) break;
-
-              const dayEvents = eventsByDate[date];
-              const displayEvents = dayEvents.slice(0, maxEventsPerDay);
-
-              // 曜日を取得
-              const dayOfWeek = new Date(date + 'T00:00:00').toLocaleDateString('ja-JP', { 
-                weekday: 'short',
-                timeZone: 'Asia/Tokyo'
-              });
-
-              let dayText = '';
-              displayEvents.forEach(event => {
-                if (totalDisplayed >= maxTotalEvents) return;
-
-                const description = event.description || '';
-                const isCountdownOn = description.toLowerCase().includes('カウントダウン:on');
-                const status = isCountdownOn ? '🟢' : '⚪';
-
-                let timeDisplay;
-                if (event.start.dateTime) {
-                  // 時刻指定の予定
-                  const startTime = new Date(event.start.dateTime);
-                  const timeStr = this.formatJSTDate(startTime).split(' ')[1]; // 時刻部分のみ
-                  timeDisplay = `${timeStr}`;
-                } else {
-                  // 終日予定
-                  timeDisplay = '終日';
-                }
-
-                dayText += `${status} ${timeDisplay} ${event.summary}\n`;
-                totalDisplayed++;
-              });
-
-              if (dayEvents.length > maxEventsPerDay) {
-                dayText += `... 他${dayEvents.length - maxEventsPerDay}件\n`;
-              }
-
-              embed.addFields({
-                name: `📆 ${date} (${dayOfWeek})`,
-                value: dayText || '予定なし',
-                inline: false
-              });
-            }
-
-            if (events.length > maxTotalEvents) {
-              embed.setFooter({ text: `※ 表示制限により、${maxTotalEvents}件まで表示。詳細は /countdown list で確認してください。` });
-            }
-
-            const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
-            if (channel) {
-              await channel.send({ embeds: [embed] });
-              console.log('✅ 週間予定通知を送信しました');
-            } else {
-              console.error('❌ 通知チャンネルが見つかりません');
-            }
-
-          } catch (error) {
-            console.error('週間予定通知送信エラー:', error);
+          let timeDisplay;
+          if (event.start.dateTime) {
+            // 時刻指定の予定
+            const startTime = new Date(event.start.dateTime);
+            const timeStr = this.formatJSTDate(startTime).split(' ')[1]; // 時刻部分のみ
+            timeDisplay = `${timeStr}`;
+          } else {
+            // 終日予定
+            timeDisplay = '終日';
           }
+
+          dayText += `${status} ${timeDisplay} ${event.summary}\n`;
+          totalDisplayed++;
+        });
+
+        if (dayEvents.length > maxEventsPerDay) {
+          dayText += `... 他${dayEvents.length - maxEventsPerDay}件\n`;
         }
 
-        async sendDailyNotification() {
-          try {
-            console.log(`📬 カウントダウン通知準備中... (JST: ${this.formatJSTDate(new Date(), true)})`);
+        embed.addFields({
+          name: `📆 ${date} (${dayOfWeek})`,
+          value: dayText || '予定なし',
+          inline: false
+        });
+      }
 
-            const now = new Date();
-            const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      if (events.length > maxTotalEvents) {
+        embed.setFooter({ text: `※ 表示制限により、${maxTotalEvents}件まで表示。詳細は /countdown list で確認してください。` });
+      }
 
-            const response = await this.calendar.events.list({
-              calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-              timeMin: now.toISOString(),
-              timeMax: futureDate.toISOString(),
-              singleEvents: true,
-              orderBy: 'startTime'
-            });
+      const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
+      if (channel) {
+        await channel.send({ embeds: [embed] });
+        console.log('✅ 週間予定通知を送信しました');
+      } else {
+        console.error('❌ 通知チャンネルが見つかりません');
+      }
 
-            const events = response.data.items || [];
+    } catch (error) {
+      console.error('週間予定通知送信エラー:', error);
+    }
+  }
 
-            const countdownEvents = events.filter(event => {
-              const description = event.description || '';
-              return description.toLowerCase().includes('カウントダウン:on');
-            });
+  async sendDailyNotification() {
+    try {
+      console.log(`📬 カウントダウン通知準備中... (JST: ${this.formatJSTDate(new Date(), true)})`);
 
-            if (countdownEvents.length === 0) {
-              console.log('📭 カウントダウン対象の予定がありません');
-              return;
-            }
+      const now = new Date();
+      const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-            const topEvents = countdownEvents.slice(0, 3);
+      // 🔥 タイムアウト対策を適用
+      const response = await this.callCalendarAPIWithTimeout(
+        this.calendar.events.list({
+          calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+          timeMin: now.toISOString(),
+          timeMax: futureDate.toISOString(),
+          singleEvents: true,
+          orderBy: 'startTime'
+        })
+      );
 
-            const embed = new EmbedBuilder()
-              .setTitle('📅 本日のカウントダウン')
-              .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}`)
-              .setColor('#FFD700')
-              .setTimestamp();
+      const events = response.data.items || [];
 
-            topEvents.forEach(event => {
-              const startTime = new Date(event.start.dateTime || event.start.date);
-              const daysLeft = this.calculateDaysLeft(startTime);
-              const description = event.description || '';
+      const countdownEvents = events.filter(event => {
+        const description = event.description || '';
+        return description.toLowerCase().includes('カウントダウン:on');
+      });
 
-              const plannedMatch = description.match(/想定締切:(\d{4}-\d{2}-\d{2})/);
-              let plannedText = '';
+      if (countdownEvents.length === 0) {
+        console.log('📭 カウントダウン対象の予定がありません');
+        return;
+      }
 
-              if (plannedMatch) {
-                const plannedDate = new Date(plannedMatch[1] + 'T23:59:59');
-                const plannedDaysLeft = this.calculateDaysLeft(plannedDate);
-                plannedText = `\n   └ 想定締切まで：あと${plannedDaysLeft}日`;
-              }
+      const topEvents = countdownEvents.slice(0, 3);
 
-              let urgencyEmoji = '🟢';
-              if (daysLeft <= 1) urgencyEmoji = '🔴';
-              else if (daysLeft <= 3) urgencyEmoji = '🟡';
-              else if (daysLeft <= 7) urgencyEmoji = '🟠';
+      const embed = new EmbedBuilder()
+        .setTitle('📅 本日のカウントダウン')
+        .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}`)
+        .setColor('#FFD700')
+        .setTimestamp();
 
-              embed.addFields({
-                name: `${urgencyEmoji} ${event.summary}`,
-                value: `   └ 実際締切まで：あと${daysLeft}日${plannedText}`,
-                inline: false
-              });
-            });
+      topEvents.forEach(event => {
+        const startTime = new Date(event.start.dateTime || event.start.date);
+        const daysLeft = this.calculateDaysLeft(startTime);
+        const description = event.description || '';
 
-            const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
-            if (channel) {
-              await channel.send({ embeds: [embed] });
-              console.log('✅ カウントダウン通知を送信しました');
-            } else {
-              console.error('❌ 通知チャンネルが見つかりません');
-            }
+        const plannedMatch = description.match(/想定締切:(\d{4}-\d{2}-\d{2})/);
+        let plannedText = '';
 
-          } catch (error) {
-            console.error('通知送信エラー:', error);
-          }
+        if (plannedMatch) {
+          const plannedDate = new Date(plannedMatch[1] + 'T23:59:59');
+          const plannedDaysLeft = this.calculateDaysLeft(plannedDate);
+          plannedText = `\n   └ 想定締切まで：あと${plannedDaysLeft}日`;
         }
+
+        let urgencyEmoji = '🟢';
+        if (daysLeft <= 1) urgencyEmoji = '🔴';
+        else if (daysLeft <= 3) urgencyEmoji = '🟡';
+        else if (daysLeft <= 7) urgencyEmoji = '🟠';
+
+        embed.addFields({
+          name: `${urgencyEmoji} ${event.summary}`,
+          value: `   └ 実際締切まで：あと${daysLeft}日${plannedText}`,
+          inline: false
+        });
+      });
+
+      const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
+      if (channel) {
+        await channel.send({ embeds: [embed] });
+        console.log('✅ カウントダウン通知を送信しました');
+      } else {
+        console.error('❌ 通知チャンネルが見つかりません');
+      }
+
+    } catch (error) {
+      console.error('通知送信エラー:', error);
+    }
+  }
 
   async registerCommands() {
-      const commands = [
-        new SlashCommandBuilder()
-          .setName('schedule')
-          .setDescription('Google カレンダーに予定を追加（日本時間・24時間制）')
-          .addSubcommand(subcommand =>
-            subcommand
-              .setName('add')
-              .setDescription('新しい予定を追加')
-              .addStringOption(option =>
-                option.setName('title')
-                  .setDescription('予定のタイトル')
-                  .setRequired(true))
-              .addStringOption(option =>
-                option.setName('date')
-                  .setDescription('日付 (YYYY-MM-DD) ※日本時間')
-                  .setRequired(true))
-              .addStringOption(option =>
-                option.setName('time')
-                  .setDescription('開始時刻 (HH:MM) ※24時間制・日本時間')
-                  .setRequired(false))
-              .addStringOption(option =>
-                option.setName('endtime')
-                  .setDescription('終了時刻 (HH:MM) ※24時間制・日本時間')
-                  .setRequired(false))
-              .addStringOption(option =>
-                option.setName('planned')
-                  .setDescription('想定締切日 (YYYY-MM-DD)')
-                  .setRequired(false))
-              .addBooleanOption(option =>
-                option.setName('allday')
-                  .setDescription('終日予定にする')
-                  .setRequired(false))
-              .addBooleanOption(option =>
-                option.setName('countdown')
-                  .setDescription('カウントダウン通知を有効にする')
-                  .setRequired(false))
-              .addStringOption(option =>
-                option.setName('description')
-                  .setDescription('詳細説明')
-                  .setRequired(false))),
+    const commands = [
+      new SlashCommandBuilder()
+        .setName('schedule')
+        .setDescription('Google カレンダーに予定を追加（日本時間・24時間制）')
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('add')
+            .setDescription('新しい予定を追加')
+            .addStringOption(option =>
+              option.setName('title')
+                .setDescription('予定のタイトル')
+                .setRequired(true))
+            .addStringOption(option =>
+              option.setName('date')
+                .setDescription('日付 (YYYY-MM-DD) ※日本時間')
+                .setRequired(true))
+            .addStringOption(option =>
+              option.setName('time')
+                .setDescription('開始時刻 (HH:MM) ※24時間制・日本時間')
+                .setRequired(false))
+            .addStringOption(option =>
+              option.setName('endtime')
+                .setDescription('終了時刻 (HH:MM) ※24時間制・日本時間')
+                .setRequired(false))
+            .addStringOption(option =>
+              option.setName('planned')
+                .setDescription('想定締切日 (YYYY-MM-DD)')
+                .setRequired(false))
+            .addBooleanOption(option =>
+              option.setName('allday')
+                .setDescription('終日予定にする')
+                .setRequired(false))
+            .addBooleanOption(option =>
+              option.setName('countdown')
+                .setDescription('カウントダウン通知を有効にする')
+                .setRequired(false))
+            .addStringOption(option =>
+              option.setName('description')
+                .setDescription('詳細説明')
+                .setRequired(false))),
 
-        new SlashCommandBuilder()
-          .setName('countdown')
-          .setDescription('カウントダウン管理')
-          .addSubcommand(subcommand =>
-            subcommand
-              .setName('test')
-              .setDescription('カウントダウン通知をテスト送信'))
-          .addSubcommand(subcommand =>
-            subcommand
-              .setName('weekly-test')
-              .setDescription('週間予定通知をテスト送信'))
-          .addSubcommand(subcommand =>
-            subcommand
-              .setName('toggle')
-              .setDescription('予定のカウントダウンをオン/オフ切り替え')
-              .addStringOption(option =>
-                option.setName('keyword')
-                  .setDescription('切り替える予定のキーワード')
-                  .setRequired(true)))
-          .addSubcommand(subcommand =>
-            subcommand
-              .setName('list')
-              .setDescription('今後の予定一覧を表示（日本時間・24時間制）')
-              .addIntegerOption(option =>
-                option.setName('days')
-                  .setDescription('表示する日数（1-365日）')
-                  .setRequired(false)
-                  .setMinValue(1)
-                  .setMaxValue(365))),
+      new SlashCommandBuilder()
+        .setName('countdown')
+        .setDescription('カウントダウン管理')
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('test')
+            .setDescription('カウントダウン通知をテスト送信'))
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('weekly-test')
+            .setDescription('週間予定通知をテスト送信'))
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('toggle')
+            .setDescription('予定のカウントダウンをオン/オフ切り替え')
+            .addStringOption(option =>
+              option.setName('keyword')
+                .setDescription('切り替える予定のキーワード')
+                .setRequired(true)))
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('list')
+            .setDescription('今後の予定一覧を表示（日本時間・24時間制）')
+            .addIntegerOption(option =>
+              option.setName('days')
+                .setDescription('表示する日数（1-365日）')
+                .setRequired(false)
+                .setMinValue(1)
+                .setMaxValue(365))),
 
-        new SlashCommandBuilder()
-          .setName('ping')
-          .setDescription('Botの動作確認（日本時間・24時間制表示）')
-      ];
-
-      const rest = new REST({ version: '10' }).setToken(CONFIG.DISCORD_TOKEN);
-
-      try {
-        console.log('🔄 スラッシュコマンドを登録中...');
-
-        await rest.put(
-          Routes.applicationCommands(CONFIG.DISCORD_CLIENT_ID),
-          { body: commands.map(command => command.toJSON()) }
-        );
-
-        console.log('✅ スラッシュコマンドの登録が完了しました');
-      } catch (error) {
-        console.error('❌ スラッシュコマンドの登録に失敗しました:', error);
-      }
-    }
-
-    async start() {
-      try {
-        console.log('🚀 Calendar Bird を起動中...');
-
-        await this.registerCommands();
-        await this.client.login(CONFIG.DISCORD_TOKEN);
-
-      } catch (error) {
-        console.error('❌ Bot起動エラー:', error);
-        process.exit(1);
-      }
-    }
-  }
-
-  function checkEnvironmentVariables() {
-    const required = [
-      'DISCORD_TOKEN',
-      'DISCORD_CLIENT_ID', 
-      'GOOGLE_CALENDAR_ID',
-      'NOTIFICATION_CHANNEL_ID',
-      'SERVICE_ACCOUNT_EMAIL',
-      'SERVICE_ACCOUNT_PRIVATE_KEY'
+      new SlashCommandBuilder()
+        .setName('ping')
+        .setDescription('Botの動作確認（日本時間・24時間制表示）')
     ];
 
-    const missing = required.filter(key => !process.env[key]);
+    const rest = new REST({ version: '10' }).setToken(CONFIG.DISCORD_TOKEN);
 
-    if (missing.length > 0) {
-      console.error('❌ 必要な環境変数が設定されていません:');
-      missing.forEach(key => console.error(`  - ${key}`));
+    try {
+      console.log('🔄 スラッシュコマンドを登録中...');
+
+      await rest.put(
+        Routes.applicationCommands(CONFIG.DISCORD_CLIENT_ID),
+        { body: commands.map(command => command.toJSON()) }
+      );
+
+      console.log('✅ スラッシュコマンドの登録が完了しました');
+    } catch (error) {
+      console.error('❌ スラッシュコマンドの登録に失敗しました:', error);
+    }
+  }
+
+  async start() {
+    try {
+      console.log('🚀 Calendar Bird を起動中...');
+
+      await this.registerCommands();
+      await this.client.login(CONFIG.DISCORD_TOKEN);
+
+    } catch (error) {
+      console.error('❌ Bot起動エラー:', error);
       process.exit(1);
     }
-
-    console.log('✅ 環境変数チェック完了');
   }
+}
 
-  async function main() {
-    console.log('🤖 === Calendar Bird Bot 起動 ===');
+function checkEnvironmentVariables() {
+  const required = [
+    'DISCORD_TOKEN',
+    'DISCORD_CLIENT_ID', 
+    'GOOGLE_CALENDAR_ID',
+    'NOTIFICATION_CHANNEL_ID',
+    'SERVICE_ACCOUNT_EMAIL',
+    'SERVICE_ACCOUNT_PRIVATE_KEY'
+  ];
 
-    checkEnvironmentVariables();
+  const missing = required.filter(key => !process.env[key]);
 
-    const bot = new CalendarBird();
-    await bot.start();
-  }
-
-  process.on('unhandledRejection', (error) => {
-    console.error('Unhandled promise rejection:', error);
-  });
-
-  process.on('uncaughtException', (error) => {
-    console.error('Uncaught exception:', error);
+  if (missing.length > 0) {
+    console.error('❌ 必要な環境変数が設定されていません:');
+    missing.forEach(key => console.error(`  - ${key}`));
     process.exit(1);
-  });
+  }
 
-  main().catch(console.error);
+  console.log('✅ 環境変数チェック完了');
+}
+
+async function main() {
+  console.log('🤖 === Calendar Bird Bot 起動 ===');
+
+  checkEnvironmentVariables();
+
+  const bot = new CalendarBird();
+  await bot.start();
+}
+
+process.on('unhandledRejection', (error) => {
+  console.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error);
+  process.exit(1);
+});
+
+main().catch(console.error);
