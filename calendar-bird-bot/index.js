@@ -303,39 +303,59 @@ class CalendarBird {
 
       console.log('✅ カレンダーイベント作成完了');
 
-      const embed = new EmbedBuilder()
-        .setTitle('✅ 予定を追加しました')
-        .setColor(countdownEnabled ? '#00FF00' : '#808080')
-        .setTimestamp();
+      // 🔥 応答が確実に送信されるよう修正
+      try {
+        const embed = new EmbedBuilder()
+          .setTitle('✅ 予定を追加しました')
+          .setColor(countdownEnabled ? '#00FF00' : '#808080')
+          .setTimestamp();
 
-      if (isAllDay) {
-        embed.addFields(
-          { name: 'タイトル', value: title, inline: true },
-          { name: '種類', value: '📅 終日予定', inline: true },
-          { name: '日付', value: `${date} (JST)`, inline: true },
-          { name: '想定締切', value: planned || 'なし', inline: true },
-          { name: 'カウントダウン', value: countdownEnabled ? '🟢 ON' : '🔴 OFF', inline: true }
-        );
-      } else {
-        const endTimeDisplay = endTime || `${String(parseInt(time.split(':')[0]) + 1).padStart(2, '0')}:${time.split(':')[1]}`;
-        embed.addFields(
-          { name: 'タイトル', value: title, inline: true },
-          { name: '開始時刻', value: `${date} ${time} (JST)`, inline: true },
-          { name: '終了時刻', value: `${endTimeDisplay} (JST)`, inline: true },
-          { name: '想定締切', value: planned || 'なし', inline: true },
-          { name: 'カウントダウン', value: countdownEnabled ? '🟢 ON' : '🔴 OFF', inline: true }
-        );
+        if (isAllDay) {
+          embed.addFields(
+            { name: 'タイトル', value: title, inline: true },
+            { name: '種類', value: '📅 終日予定', inline: true },
+            { name: '日付', value: `${date} (JST)`, inline: true },
+            { name: '想定締切', value: planned || 'なし', inline: true },
+            { name: 'カウントダウン', value: countdownEnabled ? '🟢 ON' : '🔴 OFF', inline: true }
+          );
+        } else {
+          const endTimeDisplay = endTime || `${String(parseInt(time.split(':')[0]) + 1).padStart(2, '0')}:${time.split(':')[1]}`;
+          embed.addFields(
+            { name: 'タイトル', value: title, inline: true },
+            { name: '開始時刻', value: `${date} ${time} (JST)`, inline: true },
+            { name: '終了時刻', value: `${endTimeDisplay} (JST)`, inline: true },
+            { name: '想定締切', value: planned || 'なし', inline: true },
+            { name: 'カウントダウン', value: countdownEnabled ? '🟢 ON' : '🔴 OFF', inline: true }
+          );
+        }
+
+        await interaction.editReply({ embeds: [embed] });
+        console.log('✅ Discord応答送信完了');
+        
+      } catch (embedError) {
+        console.error('Embed作成エラー:', embedError);
+        // 🔥 Embedに失敗した場合はテキストで応答
+        await interaction.editReply({ 
+          content: `✅ 予定「${title}」を ${date} ${time || '終日'} に追加しました！` 
+        });
+        console.log('✅ Discord応答送信完了（テキスト版）');
       }
-
-      await interaction.editReply({ embeds: [embed] });
 
     } catch (error) {
       console.error('Schedule コマンドエラー:', error);
 
       try {
-        await interaction.editReply({ 
-          content: `❌ エラーが発生しました: ${error.message}` 
-        });
+        // 🔥 エラー応答も確実に送信
+        if (interaction.deferred && !interaction.replied) {
+          await interaction.editReply({ 
+            content: `❌ エラーが発生しました: ${error.message}` 
+          });
+        } else if (!interaction.replied) {
+          await interaction.reply({ 
+            content: `❌ エラーが発生しました: ${error.message}` 
+          });
+        }
+        console.log('✅ エラー応答送信完了');
       } catch (replyError) {
         console.error('返信エラー:', replyError);
       }
