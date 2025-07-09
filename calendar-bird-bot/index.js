@@ -623,72 +623,121 @@ class CalendarBird {
       const initialEmbed = generateEmbed(currentPage);
       const initialComponents = generateButtons(currentPage);
 
-      const reply = await interaction.editReply({ 
-        embeds: [initialEmbed], 
-        components: initialComponents
-      });
+      console.log('📤 Discord応答送信開始...');
+      console.log(`📊 Embed フィールド数: ${initialEmbed.data.fields ? initialEmbed.data.fields.length : 0}`);
+      console.log(`🔘 コンポーネント数: ${initialComponents.length}`);
 
-      // 1ページしかない場合はコレクター設定不要
-      if (totalPages <= 1) {
-        console.log('📄 1ページのみなので、ボタンコレクターは設定しません');
-        return;
-      }
+      try {
+        const reply = await interaction.editReply({ 
+          embeds: [initialEmbed], 
+          components: initialComponents
+        });
+        console.log('✅ Discord応答送信成功');
 
-      // ボタン操作のコレクター（複数ページの場合のみ）
-      const collector = reply.createMessageComponentCollector({ 
-        time: 300000
-      });
-
-      collector.on('collect', async (buttonInteraction) => {
-        if (buttonInteraction.user.id !== interaction.user.id) {
-          await buttonInteraction.reply({ 
-            content: '❌ この操作はコマンドを実行したユーザーのみ使用できます。', 
-            ephemeral: true 
-          });
+        // 1ページしかない場合はコレクター設定不要
+        if (totalPages <= 1) {
+          console.log('📄 1ページのみなので、ボタンコレクターは設定しません');
           return;
         }
 
-        try {
-          if (buttonInteraction.customId === 'prev_page' && currentPage > 0) {
-            currentPage--;
-          } else if (buttonInteraction.customId === 'next_page' && currentPage < totalPages - 1) {
-            currentPage++;
-          } else if (buttonInteraction.customId === 'close_list') {
-            collector.stop();
-            await buttonInteraction.update({ 
-              embeds: [initialEmbed.setDescription('🔒 予定一覧を閉じました。')], 
-              components: [] 
+        // ボタン操作のコレクター（複数ページの場合のみ）
+        const collector = reply.createMessageComponentCollector({ 
+          time: 300000
+        });
+
+        collector.on('collect', async (buttonInteraction) => {
+          if (buttonInteraction.user.id !== interaction.user.id) {
+            await buttonInteraction.reply({ 
+              content: '❌ この操作はコマンドを実行したユーザーのみ使用できます。', 
+              ephemeral: true 
             });
             return;
           }
 
-          const newEmbed = generateEmbed(currentPage);
-          const newComponents = generateButtons(currentPage);
+          try {
+            if (buttonInteraction.customId === 'prev_page' && currentPage > 0) {
+              currentPage--;
+            } else if (buttonInteraction.customId === 'next_page' && currentPage < totalPages - 1) {
+              currentPage++;
+            } else if (buttonInteraction.customId === 'close_list') {
+              collector.stop();
+              await buttonInteraction.update({ 
+                embeds: [initialEmbed.setDescription('🔒 予定一覧を閉じました。')], 
+                components: [] 
+              });
+              return;
+            }
 
-          await buttonInteraction.update({ 
-            embeds: [newEmbed], 
-            components: newComponents 
-          });
+            const newEmbed = generateEmbed(currentPage);
+            const newComponents = generateButtons(currentPage);
 
-        } catch (error) {
-          console.error('ボタン操作エラー:', error);
-          await buttonInteraction.reply({ 
-            content: '❌ 操作中にエラーが発生しました。', 
-            ephemeral: true 
-          });
-        }
-      });
+            await buttonInteraction.update({ 
+              embeds: [newEmbed], 
+              components: newComponents 
+            });
 
-      collector.on('end', async () => {
+          } catch (error) {
+            console.error('ボタン操作エラー:', error);
+            await buttonInteraction.reply({ 
+              content: '❌ 操作中にエラーが発生しました。', 
+              ephemeral: true 
+            });
+          }
+        });
+
+        collector.on('end', async () => {
+          try {
+            await interaction.editReply({ 
+              embeds: [initialEmbed.setDescription('⏰ 操作時間が終了しました。')], 
+              components: [] 
+            });
+          } catch (error) {
+            console.error('コレクター終了エラー:', error);
+          }
+        });
+
+      } catch (embedError) {
+        console.error('❌ Discord応答送信エラー:', embedError);
+        
+        // Embedでの送信に失敗した場合、シンプルなテキストで代替
         try {
-          await interaction.editReply({ 
-            embeds: [initialEmbed.setDescription('⏰ 操作時間が終了しました。')], 
-            components: [] 
+          console.log('🔄 テキスト形式で再送信を試行...');
+          
+          let textContent = `📅 今後の予定一覧（${days}日間）\n`;
+          textContent += `🕐 現在の日本時間: ${this.formatJSTDate(new Date(), true)}\n`;
+          textContent += `📊 全${allEvents.length}件の予定\n\n`;
+          
+          const displayEvents = allEvents.slice(0, 10); // 最初の10件のみ表示
+          
+          displayEvents.forEach((event, index) => {
+            const startTime = new Date(event.start.dateTime || event.start.date);
+            const description = event.description || '';
+            const isCountdownOn = description.toLowerCase().includes('カウントダウン:on');
+            const status = isCountdownOn ? '🟢' : '🔴';
+            const daysLeft = this.calculateDaysLeft(startTime);
+
+            let timeDisplay;
+            if (event.start.dateTime) {
+              timeDisplay = this.formatJSTDate(startTime);
+            } else {
+              timeDisplay = this.formatJSTDateOnly(startTime);
+            }
+
+            textContent += `${status} ${event.summary}\n${timeDisplay} (あと${daysLeft}日)\n\n`;
           });
-        } catch (error) {
-          console.error('コレクター終了エラー:', error);
+          
+          if (allEvents.length > 10) {
+            textContent += `... 他${allEvents.length - 10}件の予定があります`;
+          }
+
+          await interaction.editReply({ content: textContent });
+          console.log('✅ テキスト形式での応答送信成功');
+          
+        } catch (textError) {
+          console.error('❌ テキスト応答も失敗:', textError);
+          await interaction.editReply({ content: '❌ 予定一覧の表示に失敗しました。' });
         }
-      });
+      }
 
     } catch (error) {
       console.error('予定一覧取得エラー:', error);
