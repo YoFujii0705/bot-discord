@@ -589,12 +589,15 @@ class CalendarBird {
           });
         }
 
-        row.push({
-          type: 2,
-          style: 4,
-          label: '❌ 閉じる',
-          custom_id: 'close_list'
-        });
+        // 🔥 複数ページがある場合のみ「閉じる」ボタンを表示
+        if (totalPages > 1) {
+          row.push({
+            type: 2,
+            style: 4,
+            label: '❌ 閉じる',
+            custom_id: 'close_list'
+          });
+        }
 
         return row.length > 0 ? [{
           type: 1,
@@ -907,13 +910,33 @@ class CalendarBird {
 
       const events = response.data.items || [];
 
+      // 🔥 カウントダウン対象の予定をフィルタリング（想定締切ロジック追加）
       const countdownEvents = events.filter(event => {
         const description = event.description || '';
-        return description.toLowerCase().includes('カウントダウン:on');
+        
+        // カウントダウンがONでない場合は除外
+        if (!description.toLowerCase().includes('カウントダウン:on')) {
+          return false;
+        }
+
+        // 想定締切がある場合のチェック
+        const plannedMatch = description.match(/想定締切:(\d{4}-\d{2}-\d{2})/);
+        if (plannedMatch) {
+          const plannedDate = new Date(plannedMatch[1] + 'T23:59:59');
+          const plannedDaysLeft = this.calculateDaysLeft(plannedDate);
+          
+          // 🔥 想定締切を過ぎている場合は除外
+          if (plannedDaysLeft < 0) {
+            console.log(`⏭️ "${event.summary}" は想定締切(${plannedMatch[1]})を過ぎているため除外`);
+            return false;
+          }
+        }
+
+        return true;
       });
 
       if (countdownEvents.length === 0) {
-        console.log('📭 カウントダウン対象の予定がありません');
+        console.log('📭 カウントダウン対象の予定がありません（想定締切を過ぎた予定は除外済み）');
         return;
       }
 
@@ -936,7 +959,13 @@ class CalendarBird {
         if (plannedMatch) {
           const plannedDate = new Date(plannedMatch[1] + 'T23:59:59');
           const plannedDaysLeft = this.calculateDaysLeft(plannedDate);
-          plannedText = `\n   └ 想定締切まで：あと${plannedDaysLeft}日`;
+          
+          // 🔥 想定締切の表示ロジック改善
+          if (plannedDaysLeft >= 0) {
+            plannedText = `\n   └ 想定締切まで：あと${plannedDaysLeft}日`;
+          } else {
+            plannedText = `\n   └ 想定締切：${Math.abs(plannedDaysLeft)}日経過`;
+          }
         }
 
         let urgencyEmoji = '🟢';
