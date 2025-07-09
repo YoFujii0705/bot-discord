@@ -134,13 +134,13 @@ class CalendarBird {
         }
       } catch (error) {
         console.error('コマンド実行エラー:', error);
-        const reply = { content: `エラーが発生しました: ${error.message}` };
-
+        
+        // 🔥 エラー時の応答を改善
         try {
-          if (interaction.replied || interaction.deferred) {
-            await interaction.editReply(reply);
-          } else {
-            await interaction.reply(reply);
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: `❌ エラーが発生しました: ${error.message}` });
+          } else if (interaction.deferred) {
+            await interaction.editReply({ content: `❌ エラーが発生しました: ${error.message}` });
           }
         } catch (replyError) {
           console.error('返信エラー:', replyError);
@@ -368,27 +368,28 @@ class CalendarBird {
   }
 
   async handleCountdownCommand(interaction) {
+    const subcommand = interaction.options.getSubcommand();
+    
     try {
-      // 🔥 最優先でdeferReplyを呼ぶ
-      await interaction.deferReply();
-      console.log('✅ countdown deferReply完了');
-
-      const subcommand = interaction.options.getSubcommand();
-
+      // 🔥 サブコマンドによって最初の応答を変える
       if (subcommand === 'test') {
+        await interaction.reply({ content: '🔔 カウントダウン通知をテスト送信中...' });
         console.log(`🔔 テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
         await this.sendDailyNotification();
         await interaction.editReply({ content: '✅ カウントダウン通知をテスト送信しました！' });
       } 
       else if (subcommand === 'weekly-test') {
+        await interaction.reply({ content: '📅 週間予定通知をテスト送信中...' });
         console.log(`📅 週間予定テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
         await this.sendWeeklySchedule();
         await interaction.editReply({ content: '✅ 週間予定通知をテスト送信しました！' });
       }
       else if (subcommand === 'toggle') {
+        await interaction.reply({ content: '🔍 予定を検索中...' });
         await this.handleToggleCommand(interaction);
       }
       else if (subcommand === 'list') {
+        await interaction.reply({ content: '📋 予定一覧を取得中...' });
         await this.handleListCommand(interaction);
       }
 
@@ -396,27 +397,20 @@ class CalendarBird {
       console.error('Countdown コマンドエラー:', error);
 
       try {
-        await interaction.editReply({ 
-          content: `❌ エラーが発生しました: ${error.message}` 
-        });
+        if (!interaction.replied) {
+          await interaction.reply({ content: `❌ エラーが発生しました: ${error.message}` });
+        } else {
+          await interaction.editReply({ content: `❌ エラーが発生しました: ${error.message}` });
+        }
         console.log('✅ countdown エラー応答送信完了');
       } catch (replyError) {
         console.error('countdown 返信エラー:', replyError);
-        
-        try {
-          await interaction.followUp({ 
-            content: `❌ エラーが発生しました: ${error.message}` 
-          });
-          console.log('✅ countdown フォローアップ送信完了');
-        } catch (followUpError) {
-          console.error('countdown フォローアップエラー:', followUpError);
-        }
       }
     }
   }
 
   async handleToggleCommand(interaction) {
-    // 🔥 interaction は既に handleCountdownCommand で deferReply 済み
+    // 🔥 interaction は既に handleCountdownCommand で reply 済み
     const keyword = interaction.options.getString('keyword');
 
     try {
@@ -454,6 +448,7 @@ class CalendarBird {
       }
 
       if (matchingEvents.length === 1) {
+        await interaction.editReply({ content: '🔄 カウントダウンを切り替え中...' });
         await this.toggleEventCountdown(matchingEvents[0]);
         const newStatus = await this.getEventCountdownStatus(matchingEvents[0].id);
         await interaction.editReply({ 
@@ -528,7 +523,7 @@ class CalendarBird {
   }
 
   async handleListCommand(interaction) {
-    // 🔥 interaction は既に handleCountdownCommand で deferReply 済み
+    // 🔥 interaction は既に handleCountdownCommand で reply 済み
     const days = interaction.options.getInteger('days') || 30;
 
     try {
@@ -653,6 +648,124 @@ class CalendarBird {
 
       // ボタン操作のコレクター（複数ページの場合のみ）
       const collector = reply.createMessageComponentCollector({ 
+        time: 300000 // 5分間
+      });
+
+      collector.on('collect', async (buttonInteraction) => {
+        if (buttonInteraction.user.id !== interaction.user.id) {
+          await buttonInteraction.reply({ 
+            content: '❌ この操作はコマンドを実行したユーザーのみ使用できます。', 
+            ephemeral: true 
+          });
+          return;
+        }
+
+        try {
+          if (buttonInteraction.customId === 'prev_page' && currentPage > 0) {
+            currentPage--;
+          } else if (buttonInteraction.customId === 'next_page' && currentPage < totalPages - 1) {
+            currentPage++;
+          } else if (buttonInteraction.customId === 'close_list') {
+            collector.stop();
+            await buttonInteraction.update({ 
+              embeds: [initialEmbed.setDescription('🔒 予定一覧を閉じました。')], 
+              components: [] 
+            });
+            return;
+          }
+
+          const newEmbed = generateEmbed(currentPage);
+          const newComponents = generateButtons(currentPage);
+
+          await buttonInteraction.update({ 
+            embeds: [newEmbed], 
+            components: newComponents 
+          });
+
+        } catch (error) {
+          console.error('ボタン操作エラー:', error);
+          await buttonInteraction.reply({ 
+            content: '❌ 操作中にエラーが発生しました。', 
+            ephemeral: true 
+          });
+        }
+      });
+
+      collector.on('end', async () => {
+        try {
+          await interaction.editReply({ 
+            embeds: [initialEmbed.setDescription('⏰ 操作時間が終了しました。')], 
+            components: [] 
+          });
+        } catch (error) {
+          console.error('コレクター終了エラー:', error);
+        }
+      });
+
+    } catch (error) {
+      console.error('予定一覧取得エラー:', error);
+      await interaction.editReply({ content: '❌ 予定の取得に失敗しました。' });
+    }
+  }ector({ 
+        time: 300000 // 5分間
+      });
+
+      collector.on('collect', async (buttonInteraction) => {
+        if (buttonInteraction.user.id !== interaction.user.id) {
+          await buttonInteraction.reply({ 
+            content: '❌ この操作はコマンドを実行したユーザーのみ使用できます。', 
+            ephemeral: true 
+          });
+          return;
+        }
+
+        try {
+          if (buttonInteraction.customId === 'prev_page' && currentPage > 0) {
+            currentPage--;
+          } else if (buttonInteraction.customId === 'next_page' && currentPage < totalPages - 1) {
+            currentPage++;
+          } else if (buttonInteraction.customId === 'close_list') {
+            collector.stop();
+            await buttonInteraction.update({ 
+              embeds: [initialEmbed.setDescription('🔒 予定一覧を閉じました。')], 
+              components: [] 
+            });
+            return;
+          }
+
+          const newEmbed = generateEmbed(currentPage);
+          const newComponents = generateButtons(currentPage);
+
+          await buttonInteraction.update({ 
+            embeds: [newEmbed], 
+            components: newComponents 
+          });
+
+        } catch (error) {
+          console.error('ボタン操作エラー:', error);
+          await buttonInteraction.reply({ 
+            content: '❌ 操作中にエラーが発生しました。', 
+            ephemeral: true 
+          });
+        }
+      });
+
+      collector.on('end', async () => {
+        try {
+          await interaction.editReply({ 
+            embeds: [initialEmbed.setDescription('⏰ 操作時間が終了しました。')], 
+            components: [] 
+          });
+        } catch (error) {
+          console.error('コレクター終了エラー:', error);
+        }
+      });
+
+    } catch (error) {
+      console.error('予定一覧取得エラー:', error);
+      await interaction.editReply({ content: '❌ 予定の取得に失敗しました。' });
+    }
+  }ector({ 
         time: 300000 // 5分間
       });
 
