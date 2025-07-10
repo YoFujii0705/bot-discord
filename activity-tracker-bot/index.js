@@ -1248,30 +1248,6 @@ async checkAbandonedItems() {
   }
 }
 
-async sendWeeklyReport() {
-  try {
-    const weeklyStats = await this.getThisWeekStats();
-    const channel = this.client.channels.cache.first();
-    
-    if (channel) {
-      const embed = new EmbedBuilder()
-        .setTitle('📅 今週の活動レポート')
-        .setDescription('今週も頑張りました！🎉')
-        .addFields(
-          { name: '📚 読了した本', value: weeklyStats.finishedBooks > 0 ? `${weeklyStats.finishedBooks}冊` : 'なし', inline: true },
-          { name: '🎬 視聴した映画', value: weeklyStats.watchedMovies > 0 ? `${weeklyStats.watchedMovies}本` : 'なし', inline: true },
-          { name: '🎯 完了した活動', value: weeklyStats.completedActivities > 0 ? `${weeklyStats.completedActivities}件` : 'なし', inline: true }
-        )
-        .setColor('#4caf50')
-        .setFooter({ text: 'お疲れ様でした！来週も頑張りましょう！' })
-        .setTimestamp();
-      
-      await channel.send({ embeds: [embed] });
-    }
-  } catch (error) {
-    console.error('週次レポートエラー:', error);
-  }
-}
 // 検索機能
   async searchBooks(keyword) {
     if (!this.auth) return [`📚 [1] テスト本 - テスト作者 (registered) - キーワード: ${keyword}`];
