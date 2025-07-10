@@ -1013,54 +1013,51 @@ async sendWeeklyReport() {
     const weeklyStats = await this.getThisWeekStats();
     console.log('週次統計取得完了:', weeklyStats);
     
-    console.log('チャンネル取得を開始します...');
-    const channel = this.getNotificationChannel();
-    console.log('チャンネル取得結果:', {
-      channel: channel,
-      name: channel?.name,
-      id: channel?.id,
-      type: channel?.type,
-      constructor: channel?.constructor?.name,
-      sendExists: typeof channel?.send,
-      sendType: channel?.send?.toString?.()
-    });
-    
-    if (channel) {
-      console.log('チャンネル確認完了、メッセージ送信中...');
-      console.log('channel.send の型:', typeof channel.send);
-      
-      if (typeof channel.send !== 'function') {
-        console.log('ERROR: channel.send is not a function!');
-        console.log('channel object:', Object.keys(channel));
-        console.log('channel prototype:', Object.getPrototypeOf(channel));
-        return;
+    // 朝の通知と同じ方法でチャンネル取得
+    const readingBooks = await this.getCurrentReadingBooks();
+    if (readingBooks.length > 0) {
+      const channel = this.getNotificationChannel();
+      if (channel) {
+        const embed = new EmbedBuilder()
+          .setTitle('📅 今週の活動レポート')
+          .setDescription('今週も頑張りました！🎉')
+          .addFields(
+            { name: '📚 読了した本', value: weeklyStats.finishedBooks > 0 ? `${weeklyStats.finishedBooks}冊` : 'なし', inline: true },
+            { name: '🎬 視聴した映画', value: weeklyStats.watchedMovies > 0 ? `${weeklyStats.watchedMovies}本` : 'なし', inline: true },
+            { name: '🎯 完了した活動', value: weeklyStats.completedActivities > 0 ? `${weeklyStats.completedActivities}件` : 'なし', inline: true }
+          )
+          .setColor('#4caf50')
+          .setFooter({ text: 'お疲れ様でした！来週も頑張りましょう！' })
+          .setTimestamp();
+        
+        await channel.send({ embeds: [embed] });
+        console.log('✅ 週次レポートを送信しました');
       }
-      
-      const embed = new EmbedBuilder()
-        .setTitle('📅 今週の活動レポート')
-        .setDescription('今週も頑張りました！🎉')
-        .addFields(
-          { name: '📚 読了した本', value: weeklyStats.finishedBooks > 0 ? `${weeklyStats.finishedBooks}冊` : 'なし', inline: true },
-          { name: '🎬 視聴した映画', value: weeklyStats.watchedMovies > 0 ? `${weeklyStats.watchedMovies}本` : 'なし', inline: true },
-          { name: '🎯 完了した活動', value: weeklyStats.completedActivities > 0 ? `${weeklyStats.completedActivities}件` : 'なし', inline: true }
-        )
-        .setColor('#4caf50')
-        .setFooter({ text: 'お疲れ様でした！来週も頑張りましょう！' })
-        .setTimestamp();
-      
-      console.log('embed作成完了、送信実行...');
-      await channel.send({ embeds: [embed] });
-      console.log('✅ 週次レポートを送信しました');
     } else {
-      console.log('❌ 送信先チャンネルが見つかりませんでした');
+      // 読書中の本がない場合でも週次レポートは送信
+      const channel = this.getNotificationChannel();
+      if (channel) {
+        const embed = new EmbedBuilder()
+          .setTitle('📅 今週の活動レポート')
+          .setDescription('今週も頑張りました！🎉')
+          .addFields(
+            { name: '📚 読了した本', value: weeklyStats.finishedBooks > 0 ? `${weeklyStats.finishedBooks}冊` : 'なし', inline: true },
+            { name: '🎬 視聴した映画', value: weeklyStats.watchedMovies > 0 ? `${weeklyStats.watchedMovies}本` : 'なし', inline: true },
+            { name: '🎯 完了した活動', value: weeklyStats.completedActivities > 0 ? `${weeklyStats.completedActivities}件` : 'なし', inline: true }
+          )
+          .setColor('#4caf50')
+          .setFooter({ text: 'お疲れ様でした！来週も頑張りましょう！' })
+          .setTimestamp();
+        
+        await channel.send({ embeds: [embed] });
+        console.log('✅ 週次レポートを送信しました');
+      }
     }
   } catch (error) {
     console.error('❌ 週次レポートエラー:', error);
-    console.error('エラーの詳細:', error.message);
-    console.error('エラースタック:', error.stack);
   }
 }
-
+	
 async sendMonthlyReport() {
   try {
     const monthlyStats = await this.getThisMonthStats();
