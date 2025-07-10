@@ -913,6 +913,27 @@ async addDailyReport(category, id, content) {
     }, {
       timezone: "Asia/Tokyo"
     });
+
+　　// テスト用: 1分後に各通知をテスト実行
+setTimeout(async () => {
+  console.log('=== 朝の通知テスト ===');
+  await this.sendMorningReminder();
+}, 60000); // 1分後
+
+setTimeout(async () => {
+  console.log('=== 週次レポートテスト ===');
+  await this.sendWeeklyReport();
+}, 120000); // 2分後
+
+setTimeout(async () => {
+  console.log('=== 月次レポートテスト ===');
+  await this.sendMonthlyReport();
+}, 180000); // 3分後
+
+setTimeout(async () => {
+  console.log('=== 放置アラートテスト ===');
+  await this.checkAbandonedItems();
+}, 240000); // 4分後
     
     console.log('定期通知機能が有効になりました');
   }
