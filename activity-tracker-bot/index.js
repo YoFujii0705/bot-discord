@@ -940,15 +940,58 @@ setTimeout(async () => {
 
   // 通知チャンネルを取得するヘルパーメソッド
 getNotificationChannel() {
+  console.log('通知チャンネル取得開始...');
+  console.log('NOTIFICATION_CHANNEL_ID:', process.env.NOTIFICATION_CHANNEL_ID);
+  console.log('利用可能なチャンネル数:', this.client.channels.cache.size);
+  
   if (process.env.NOTIFICATION_CHANNEL_ID) {
-    return this.client.channels.cache.get(process.env.NOTIFICATION_CHANNEL_ID);
-  } else {
-    // フォールバック: 最初のテキストチャンネル
-    return this.client.channels.cache.find(channel => 
-      channel.type === 0 && // テキストチャンネル
-      channel.permissionsFor(this.client.user).has('SendMessages')
-    );
+    const channel = this.client.channels.cache.get(process.env.NOTIFICATION_CHANNEL_ID);
+    console.log('指定チャンネル:', channel ? `見つかりました (${channel.name}, type: ${channel.type})` : '見つかりませんでした');
+    if (channel && typeof channel.send === 'function') {
+      return channel;
+    }
   }
+  
+  console.log('環境変数なし or 無効 - フォールバック検索...');
+  
+  // より確実なフォールバック方法
+  const textChannels = this.client.channels.cache.filter(channel => 
+    channel.type === 0 && // テキストチャンネル
+    channel.permissionsFor && 
+    channel.permissionsFor(this.client.user) &&
+    channel.permissionsFor(this.client.user).has('SendMessages') &&
+    typeof channel.send === 'function'
+  );
+  
+  console.log('利用可能なテキストチャンネル数:', textChannels.size);
+  
+  if (textChannels.size > 0) {
+    const channel = textChannels.first();
+    console.log('選択されたチャンネル:', channel.name, 'ID:', channel.id);
+    return channel;
+  }
+  
+  // 最終的なフォールバック: ギルドの最初のチャンネル
+  const guild = this.client.guilds.cache.first();
+  if (guild) {
+    const systemChannel = guild.systemChannel;
+    if (systemChannel && typeof systemChannel.send === 'function') {
+      console.log('システムチャンネルを使用:', systemChannel.name);
+      return systemChannel;
+    }
+    
+    // ギルドの最初のテキストチャンネル
+    const firstTextChannel = guild.channels.cache.find(ch => 
+      ch.type === 0 && typeof ch.send === 'function'
+    );
+    if (firstTextChannel) {
+      console.log('ギルドの最初のテキストチャンネルを使用:', firstTextChannel.name);
+      return firstTextChannel;
+    }
+  }
+  
+  console.log('利用可能なチャンネルが見つかりませんでした');
+  return null;
 }
 
 async sendMorningReminder() {
@@ -988,9 +1031,15 @@ async sendWeeklyReport() {
     console.log('週次統計取得完了:', weeklyStats);
     
     const channel = this.getNotificationChannel();
-    console.log('チャンネル取得:', channel ? `${channel.name} (${channel.id})` : 'チャンネルが見つかりません');
+    console.log('チャンネル取得結果:', {
+      found: !!channel,
+      name: channel?.name,
+      id: channel?.id,
+      type: channel?.type,
+      hasSendMethod: channel && typeof channel.send === 'function'
+    });
     
-    if (channel) {
+    if (channel && typeof channel.send === 'function') {
       console.log('embed作成開始...');
       
       const embed = new EmbedBuilder()
@@ -1010,7 +1059,11 @@ async sendWeeklyReport() {
       await channel.send({ embeds: [embed] });
       console.log('週次レポートを送信しました');
     } else {
-      console.log('通知チャンネルが見つからないため、週次レポートを送信できませんでした');
+      console.log('有効な通知チャンネルが見つからないため、週次レポートを送信できませんでした');
+      console.log('利用可能なチャンネル一覧:');
+      this.client.channels.cache.forEach(ch => {
+        console.log(`- ${ch.name} (${ch.type}) - send: ${typeof ch.send}`);
+      });
     }
   } catch (error) {
     console.error('週次レポートエラー:', error);
