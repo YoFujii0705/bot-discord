@@ -1013,10 +1013,28 @@ async sendWeeklyReport() {
     const weeklyStats = await this.getThisWeekStats();
     console.log('週次統計取得完了:', weeklyStats);
     
+    console.log('チャンネル取得を開始します...');
     const channel = this.getNotificationChannel();
+    console.log('チャンネル取得結果:', {
+      channel: channel,
+      name: channel?.name,
+      id: channel?.id,
+      type: channel?.type,
+      constructor: channel?.constructor?.name,
+      sendExists: typeof channel?.send,
+      sendType: channel?.send?.toString?.()
+    });
     
     if (channel) {
       console.log('チャンネル確認完了、メッセージ送信中...');
+      console.log('channel.send の型:', typeof channel.send);
+      
+      if (typeof channel.send !== 'function') {
+        console.log('ERROR: channel.send is not a function!');
+        console.log('channel object:', Object.keys(channel));
+        console.log('channel prototype:', Object.getPrototypeOf(channel));
+        return;
+      }
       
       const embed = new EmbedBuilder()
         .setTitle('📅 今週の活動レポート')
@@ -1030,6 +1048,7 @@ async sendWeeklyReport() {
         .setFooter({ text: 'お疲れ様でした！来週も頑張りましょう！' })
         .setTimestamp();
       
+      console.log('embed作成完了、送信実行...');
       await channel.send({ embeds: [embed] });
       console.log('✅ 週次レポートを送信しました');
     } else {
@@ -1038,6 +1057,7 @@ async sendWeeklyReport() {
   } catch (error) {
     console.error('❌ 週次レポートエラー:', error);
     console.error('エラーの詳細:', error.message);
+    console.error('エラースタック:', error.stack);
   }
 }
 
