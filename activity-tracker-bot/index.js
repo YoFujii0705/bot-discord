@@ -940,57 +940,40 @@ setTimeout(async () => {
 
   // 通知チャンネルを取得するヘルパーメソッド
 getNotificationChannel() {
-  console.log('通知チャンネル取得開始...');
-  console.log('NOTIFICATION_CHANNEL_ID:', process.env.NOTIFICATION_CHANNEL_ID);
-  console.log('利用可能なチャンネル数:', this.client.channels.cache.size);
+  console.log('=== チャンネル取得開始 ===');
   
+  // 方法1: 環境変数で指定されたチャンネル
   if (process.env.NOTIFICATION_CHANNEL_ID) {
+    console.log('環境変数のチャンネルIDを確認中:', process.env.NOTIFICATION_CHANNEL_ID);
     const channel = this.client.channels.cache.get(process.env.NOTIFICATION_CHANNEL_ID);
-    console.log('指定チャンネル:', channel ? `見つかりました (${channel.name}, type: ${channel.type})` : '見つかりませんでした');
-    if (channel && typeof channel.send === 'function') {
+    if (channel) {
+      console.log('指定チャンネル見つかりました:', channel.name);
+      return channel;
+    } else {
+      console.log('指定チャンネルが見つかりませんでした');
+    }
+  }
+  
+  // 方法2: ギルドから直接取得（最も確実）
+  console.log('ギルドからチャンネルを取得中...');
+  const guild = this.client.guilds.cache.first();
+  console.log('ギルド:', guild ? guild.name : 'なし');
+  
+  if (guild) {
+    console.log('ギルドのチャンネル数:', guild.channels.cache.size);
+    
+    // テキストチャンネルを検索
+    const textChannels = guild.channels.cache.filter(ch => ch.type === 0);
+    console.log('テキストチャンネル数:', textChannels.size);
+    
+    if (textChannels.size > 0) {
+      const channel = textChannels.first();
+      console.log('選択したチャンネル:', channel.name, 'ID:', channel.id);
       return channel;
     }
   }
   
-  console.log('環境変数なし or 無効 - フォールバック検索...');
-  
-  // より確実なフォールバック方法
-  const textChannels = this.client.channels.cache.filter(channel => 
-    channel.type === 0 && // テキストチャンネル
-    channel.permissionsFor && 
-    channel.permissionsFor(this.client.user) &&
-    channel.permissionsFor(this.client.user).has('SendMessages') &&
-    typeof channel.send === 'function'
-  );
-  
-  console.log('利用可能なテキストチャンネル数:', textChannels.size);
-  
-  if (textChannels.size > 0) {
-    const channel = textChannels.first();
-    console.log('選択されたチャンネル:', channel.name, 'ID:', channel.id);
-    return channel;
-  }
-  
-  // 最終的なフォールバック: ギルドの最初のチャンネル
-  const guild = this.client.guilds.cache.first();
-  if (guild) {
-    const systemChannel = guild.systemChannel;
-    if (systemChannel && typeof systemChannel.send === 'function') {
-      console.log('システムチャンネルを使用:', systemChannel.name);
-      return systemChannel;
-    }
-    
-    // ギルドの最初のテキストチャンネル
-    const firstTextChannel = guild.channels.cache.find(ch => 
-      ch.type === 0 && typeof ch.send === 'function'
-    );
-    if (firstTextChannel) {
-      console.log('ギルドの最初のテキストチャンネルを使用:', firstTextChannel.name);
-      return firstTextChannel;
-    }
-  }
-  
-  console.log('利用可能なチャンネルが見つかりませんでした');
+  console.log('チャンネルが見つかりませんでした');
   return null;
 }
 
@@ -1031,16 +1014,9 @@ async sendWeeklyReport() {
     console.log('週次統計取得完了:', weeklyStats);
     
     const channel = this.getNotificationChannel();
-    console.log('チャンネル取得結果:', {
-      found: !!channel,
-      name: channel?.name,
-      id: channel?.id,
-      type: channel?.type,
-      hasSendMethod: channel && typeof channel.send === 'function'
-    });
     
-    if (channel && typeof channel.send === 'function') {
-      console.log('embed作成開始...');
+    if (channel) {
+      console.log('チャンネル確認完了、メッセージ送信中...');
       
       const embed = new EmbedBuilder()
         .setTitle('📅 今週の活動レポート')
@@ -1054,20 +1030,14 @@ async sendWeeklyReport() {
         .setFooter({ text: 'お疲れ様でした！来週も頑張りましょう！' })
         .setTimestamp();
       
-      console.log('embed作成完了、送信開始...');
-      
       await channel.send({ embeds: [embed] });
-      console.log('週次レポートを送信しました');
+      console.log('✅ 週次レポートを送信しました');
     } else {
-      console.log('有効な通知チャンネルが見つからないため、週次レポートを送信できませんでした');
-      console.log('利用可能なチャンネル一覧:');
-      this.client.channels.cache.forEach(ch => {
-        console.log(`- ${ch.name} (${ch.type}) - send: ${typeof ch.send}`);
-      });
+      console.log('❌ 送信先チャンネルが見つかりませんでした');
     }
   } catch (error) {
-    console.error('週次レポートエラー:', error);
-    console.error('エラースタック:', error.stack);
+    console.error('❌ 週次レポートエラー:', error);
+    console.error('エラーの詳細:', error.message);
   }
 }
 
