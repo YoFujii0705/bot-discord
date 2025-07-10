@@ -938,60 +938,78 @@ setTimeout(async () => {
     console.log('定期通知機能が有効になりました');
   }
 
-  async sendMorningReminder() {
-    try {
-      const readingBooks = await this.getCurrentReadingBooks();
-      
-      if (readingBooks.length > 0) {
-        const channel = this.client.channels.cache.first();
-        if (channel) {
-          const embed = new EmbedBuilder()
-            .setTitle('☀️ おはようございます！')
-            .setDescription('今日はどの本を読みますか？📚')
-            .addFields({
-              name: '📖 読書中の本',
-              value: readingBooks.map(book => `• [${book.id}] ${book.title} - ${book.author}`).join('\n'),
-              inline: false
-            })
-            .setColor('#ffeb3b')
-            .setTimestamp();
-          
-          await channel.send({ embeds: [embed] });
-        }
-      }
-    } catch (error) {
-      console.error('朝の通知エラー:', error);
-    }
+  // 通知チャンネルを取得するヘルパーメソッド
+getNotificationChannel() {
+  if (process.env.NOTIFICATION_CHANNEL_ID) {
+    return this.client.channels.cache.get(process.env.NOTIFICATION_CHANNEL_ID);
+  } else {
+    // フォールバック: 最初のテキストチャンネル
+    return this.client.channels.cache.find(channel => 
+      channel.type === 0 && // テキストチャンネル
+      channel.permissionsFor(this.client.user).has('SendMessages')
+    );
   }
+}
 
-  async sendWeeklyReport() {
-    try {
-      const weeklyStats = await this.getThisWeekStats();
-      const channel = this.client.channels.cache.first();
-      
+async sendMorningReminder() {
+  try {
+    const readingBooks = await this.getCurrentReadingBooks();
+    
+    if (readingBooks.length > 0) {
+      const channel = this.getNotificationChannel();
       if (channel) {
         const embed = new EmbedBuilder()
-          .setTitle('📅 今週の活動レポート')
-          .setDescription('今週も頑張りました！🎉')
-          .addFields(
-            { name: '📚 読了した本', value: weeklyStats.finishedBooks > 0 ? `${weeklyStats.finishedBooks}冊` : 'なし', inline: true },
-            { name: '🎬 視聴した映画', value: weeklyStats.watchedMovies > 0 ? `${weeklyStats.watchedMovies}本` : 'なし', inline: true },
-            { name: '🎯 完了した活動', value: weeklyStats.completedActivities > 0 ? `${weeklyStats.completedActivities}件` : 'なし', inline: true }
-          )
-          .setColor('#4caf50')
+          .setTitle('☀️ おはようございます！')
+          .setDescription('今日はどの本を読みますか？📚')
+          .addFields({
+            name: '📖 読書中の本',
+            value: readingBooks.map(book => `• [${book.id}] ${book.title} - ${book.author}`).join('\n'),
+            inline: false
+          })
+          .setColor('#ffeb3b')
           .setTimestamp();
         
         await channel.send({ embeds: [embed] });
+        console.log('朝の通知を送信しました');
+      } else {
+        console.log('通知チャンネルが見つかりませんでした');
       }
-    } catch (error) {
-      console.error('週次レポートエラー:', error);
     }
+  } catch (error) {
+    console.error('朝の通知エラー:', error);
   }
+}
 
-  async sendMonthlyReport() {
+async sendWeeklyReport() {
+  try {
+    const weeklyStats = await this.getThisWeekStats();
+    const channel = this.getNotificationChannel();
+    
+    if (channel) {
+      const embed = new EmbedBuilder()
+        .setTitle('📅 今週の活動レポート')
+        .setDescription('今週も頑張りました！🎉')
+        .addFields(
+          { name: '📚 読了した本', value: weeklyStats.finishedBooks > 0 ? `${weeklyStats.finishedBooks}冊` : 'なし', inline: true },
+          { name: '🎬 視聴した映画', value: weeklyStats.watchedMovies > 0 ? `${weeklyStats.watchedMovies}本` : 'なし', inline: true },
+          { name: '🎯 完了した活動', value: weeklyStats.completedActivities > 0 ? `${weeklyStats.completedActivities}件` : 'なし', inline: true }
+        )
+        .setColor('#4caf50')
+        .setFooter({ text: 'お疲れ様でした！来週も頑張りましょう！' })
+        .setTimestamp();
+      
+      await channel.send({ embeds: [embed] });
+      console.log('週次レポートを送信しました');
+    }
+  } catch (error) {
+    console.error('週次レポートエラー:', error);
+  }
+}
+
+async sendMonthlyReport() {
   try {
     const monthlyStats = await this.getThisMonthStats();
-    const channel = this.client.channels.cache.first();
+    const channel = this.getNotificationChannel();
     
     if (channel) {
       const bookList = monthlyStats.bookTitles.length > 0 
@@ -1013,48 +1031,50 @@ setTimeout(async () => {
         .setTimestamp();
       
       await channel.send({ embeds: [embed] });
+      console.log('月次レポートを送信しました');
     }
   } catch (error) {
     console.error('月次レポートエラー:', error);
   }
 }
 
-  async checkAbandonedItems() {
-    try {
-      const abandonedItems = await this.getAbandonedItems();
-      
-      if (abandonedItems.movies.length > 0 || abandonedItems.activities.length > 0) {
-        const channel = this.client.channels.cache.first();
-        if (channel) {
-          const embed = new EmbedBuilder()
-            .setTitle('⚠️ 放置されているアイテムがあります')
-            .setDescription('1週間以上放置されているものをチェックしてみませんか？')
-            .setColor('#ff9800')
-            .setTimestamp();
-          
-          if (abandonedItems.movies.length > 0) {
-            embed.addFields({
-              name: '🎬 観たい映画（1週間放置）',
-              value: abandonedItems.movies.slice(0, 5).map(movie => `• [${movie.id}] ${movie.title}`).join('\n'),
-              inline: false
-            });
-          }
-          
-          if (abandonedItems.activities.length > 0) {
-            embed.addFields({
-              name: '🎯 予定中の活動（1週間放置）',
-              value: abandonedItems.activities.slice(0, 5).map(activity => `• [${activity.id}] ${activity.content}`).join('\n'),
-              inline: false
-            });
-          }
-          
-          await channel.send({ embeds: [embed] });
+async checkAbandonedItems() {
+  try {
+    const abandonedItems = await this.getAbandonedItems();
+    
+    if (abandonedItems.movies.length > 0 || abandonedItems.activities.length > 0) {
+      const channel = this.getNotificationChannel();
+      if (channel) {
+        const embed = new EmbedBuilder()
+          .setTitle('⚠️ 放置されているアイテムがあります')
+          .setDescription('1週間以上放置されているものをチェックしてみませんか？')
+          .setColor('#ff9800')
+          .setTimestamp();
+        
+        if (abandonedItems.movies.length > 0) {
+          embed.addFields({
+            name: '🎬 観たい映画（1週間放置）',
+            value: abandonedItems.movies.slice(0, 5).map(movie => `• [${movie.id}] ${movie.title}`).join('\n'),
+            inline: false
+          });
         }
+        
+        if (abandonedItems.activities.length > 0) {
+          embed.addFields({
+            name: '🎯 予定中の活動（1週間放置）',
+            value: abandonedItems.activities.slice(0, 5).map(activity => `• [${activity.id}] ${activity.content}`).join('\n'),
+            inline: false
+          });
+        }
+        
+        await channel.send({ embeds: [embed] });
+        console.log('放置アラートを送信しました');
       }
-    } catch (error) {
-      console.error('放置アラートエラー:', error);
     }
+  } catch (error) {
+    console.error('放置アラートエラー:', error);
   }
+}
 // 統計取得のヘルパーメソッド
   async getCurrentReadingBooks() {
     if (!this.auth) return [{ id: 1, title: 'テスト本', author: 'テスト作者' }];
