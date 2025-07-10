@@ -5,33 +5,42 @@ const { google } = require('googleapis');
 class ActivityTrackerBot {
   constructor() {
     this.client = new Client({
-      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
+      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+      rest: { 
+        timeout: 30000  // 30秒に延長
+      }
     });
     
     this.sheets = google.sheets({ version: 'v4' });
     
     // Google認証の設定
-    if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-      // JSON全体が環境変数にある場合
-      const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-      this.auth = new google.auth.GoogleAuth({
-        credentials,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets']
-      });
-    } else {
-      // 個別の環境変数を使用する場合
-      this.auth = new google.auth.GoogleAuth({
-        credentials: {
-          type: 'service_account',
-          project_id: process.env.GOOGLE_PROJECT_ID,
-          client_email: process.env.GOOGLE_CLIENT_EMAIL,
-          private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-          client_id: process.env.GOOGLE_CLIENT_ID,
-          auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-          token_uri: 'https://oauth2.googleapis.com/token'
-        },
-        scopes: ['https://www.googleapis.com/auth/spreadsheets']
-      });
+    try {
+      if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+        // JSON全体が環境変数にある場合
+        const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+        this.auth = new google.auth.GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/spreadsheets']
+        });
+      } else {
+        // 個別の環境変数を使用する場合
+        this.auth = new google.auth.GoogleAuth({
+          credentials: {
+            type: 'service_account',
+            project_id: process.env.GOOGLE_PROJECT_ID,
+            client_email: process.env.GOOGLE_CLIENT_EMAIL,
+            private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+            client_id: process.env.GOOGLE_CLIENT_ID,
+            auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+            token_uri: 'https://oauth2.googleapis.com/token'
+          },
+          scopes: ['https://www.googleapis.com/auth/spreadsheets']
+        });
+      }
+    } catch (error) {
+      console.error('Google認証設定エラー:', error.message);
+      console.log('Google Sheets機能は無効化されます');
+      this.auth = null;
     }
     
     this.spreadsheetId = process.env.SPREADSHEET_ID;
@@ -196,14 +205,45 @@ class ActivityTrackerBot {
       
       case 'start':
         const startId = interaction.options.getInteger('id');
-        await this.startReading(startId);
-        await interaction.reply(`📖 読書を開始しました！頑張って！`);
+        const startedBook = await this.startReading(startId);
+        if (startedBook) {
+          const embed = new EmbedBuilder()
+            .setTitle('📖 読書開始！')
+            .setColor('#00ff00')
+            .addFields(
+              { name: 'タイトル', value: startedBook.title, inline: true },
+              { name: '作者', value: startedBook.author, inline: true },
+              { name: 'ID', value: startedBook.id.toString(), inline: true }
+            )
+            .setDescription('頑張って読み進めましょう！✨')
+            .setTimestamp();
+          
+          await interaction.reply({ embeds: [embed] });
+        } else {
+          await interaction.reply('指定されたIDの本が見つかりませんでした。');
+        }
         break;
       
       case 'finish':
         const finishId = interaction.options.getInteger('id');
-        await this.finishReading(finishId);
-        await interaction.reply(`✅ 読了おめでとうございます！🎉 また次の本も楽しみですね！`);
+        const finishedBook = await this.finishReading(finishId);
+        if (finishedBook) {
+          const embed = new EmbedBuilder()
+            .setTitle('🎉 読了おめでとうございます！')
+            .setColor('#ffd700')
+            .addFields(
+              { name: 'タイトル', value: finishedBook.title, inline: true },
+              { name: '作者', value: finishedBook.author, inline: true },
+              { name: 'ID', value: finishedBook.id.toString(), inline: true },
+              { name: '備考', value: finishedBook.memo || 'なし', inline: false }
+            )
+            .setDescription('素晴らしい達成感ですね！次の本も楽しみです📚✨')
+            .setTimestamp();
+          
+          await interaction.reply({ embeds: [embed] });
+        } else {
+          await interaction.reply('指定されたIDの本が見つかりませんでした。');
+        }
         break;
       
       case 'list':
@@ -295,8 +335,34 @@ class ActivityTrackerBot {
     const id = interaction.options.getInteger('id');
     const content = interaction.options.getString('content');
     
+    // 対象のアイテム情報を取得
+    const targetInfo = await this.getItemInfo(category, id);
+    
     await this.addDailyReport(category, id, content);
-    await interaction.reply(`📝 日報を記録しました！今日も頑張りましたね✨`);
+    
+    if (targetInfo) {
+      const categoryEmoji = {
+        'book': '📚',
+        'movie': '🎬', 
+        'activity': '🎯'
+      };
+      
+      const embed = new EmbedBuilder()
+        .setTitle(`${categoryEmoji[category]} 日報を記録しました！`)
+        .setColor('#9b59b6')
+        .addFields(
+          { name: '対象', value: targetInfo.title || targetInfo.content, inline: true },
+          { name: 'カテゴリ', value: category === 'book' ? '本' : category === 'movie' ? '映画' : '活動', inline: true },
+          { name: 'ID', value: id.toString(), inline: true },
+          { name: '記録内容', value: content, inline: false }
+        )
+        .setDescription('今日も頑張りましたね！継続は力なりです✨')
+        .setTimestamp();
+      
+      await interaction.reply({ embeds: [embed] });
+    } else {
+      await interaction.reply(`📝 日報を記録しました！\n**内容:** ${content}\n今日も頑張りましたね✨`);
+    }
   }
 
   // Google Sheets操作メソッド
@@ -354,7 +420,18 @@ class ActivityTrackerBot {
           values: [['reading', startDate]]
         }
       });
+      
+      // 更新した本の情報を返す
+      const row = values[rowIndex];
+      return {
+        id: row[0],
+        title: row[2],
+        author: row[3],
+        memo: row[4]
+      };
     }
+    
+    return null;
   }
 
   async finishReading(id) {
@@ -380,7 +457,18 @@ class ActivityTrackerBot {
           values: [['finished', finishDate]]
         }
       });
+      
+      // 完了した本の情報を返す
+      const row = values[rowIndex];
+      return {
+        id: row[0],
+        title: row[2],
+        author: row[3],
+        memo: row[4]
+      };
     }
+    
+    return null;
   }
 
   async getBooks() {
@@ -567,6 +655,61 @@ class ActivityTrackerBot {
     });
     
     return reportId;
+  }
+
+  async getItemInfo(category, id) {
+    const auth = await this.auth.getClient();
+    let range, titleColumn, contentColumn;
+    
+    switch (category) {
+      case 'book':
+        range = 'books_master!A:G';
+        titleColumn = 2; // タイトル列
+        contentColumn = 3; // 作者列
+        break;
+      case 'movie':
+        range = 'movies_master!A:F';
+        titleColumn = 2; // タイトル列
+        break;
+      case 'activity':
+        range = 'activities_master!A:F';
+        contentColumn = 2; // 活動内容列
+        break;
+      default:
+        return null;
+    }
+    
+    try {
+      const response = await this.sheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range
+      });
+      
+      const values = response.data.values || [];
+      const row = values.find(row => row[0] == id);
+      
+      if (row) {
+        if (category === 'book') {
+          return {
+            title: row[titleColumn],
+            author: row[contentColumn]
+          };
+        } else if (category === 'movie') {
+          return {
+            title: row[titleColumn]
+          };
+        } else if (category === 'activity') {
+          return {
+            content: row[contentColumn]
+          };
+        }
+      }
+    } catch (error) {
+      console.error('アイテム情報取得エラー:', error);
+    }
+    
+    return null;
   }
 
   start() {
