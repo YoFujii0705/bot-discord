@@ -442,22 +442,38 @@ setupEvents() {
   }
 
 async handleStatsCommand(interaction) {
-    const subcommand = interaction.options.getSubcommand();
+  const subcommand = interaction.options.getSubcommand();
+  
+  try {
+    let embed;
     
-    // 簡単な統計表示（詳細な統計は後で実装）
-    const embed = new EmbedBuilder()
-      .setTitle(`📊 ${subcommand} 統計`)
-      .setColor('#3498db')
-      .setDescription(`${subcommand} の統計情報です。\n（詳細な統計機能は実装中です）`)
-      .addFields(
-        { name: '📚 本', value: '登録数: 計算中...', inline: true },
-        { name: '🎬 映画', value: '登録数: 計算中...', inline: true },
-        { name: '🎯 活動', value: '登録数: 計算中...', inline: true }
-      )
-      .setTimestamp();
+    switch (subcommand) {
+      case 'summary':
+        embed = await this.createSummaryStats();
+        break;
+      case 'weekly':
+        embed = await this.createWeeklyStats();
+        break;
+      case 'monthly':
+        embed = await this.createMonthlyStats();
+        break;
+      case 'books':
+        embed = await this.createBookStats();
+        break;
+      case 'current':
+        embed = await this.createCurrentStats();
+        break;
+      default:
+        embed = await this.createSummaryStats();
+        break;
+    }
     
     await interaction.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('統計エラー:', error);
+    await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
   }
+}
 
   async handleSearchCommand(interaction) {
     const subcommand = interaction.options.getSubcommand();
@@ -1179,6 +1195,299 @@ async addDailyReport(category, id, content) {
       return [];
     }
   }
+	// 実際の統計データ取得
+async createSummaryStats() {
+  const [bookStats, movieStats, activityStats] = await Promise.all([
+    this.getBookCounts(),
+    this.getMovieCounts(),
+    this.getActivityCounts()
+  ]);
+  
+  return new EmbedBuilder()
+    .setTitle('📊 全体統計')
+    .setColor('#3498db')
+    .addFields(
+      { name: '📚 本', value: `登録: ${bookStats.total}冊\n読書中: ${bookStats.reading}冊\n読了: ${bookStats.finished}冊`, inline: true },
+      { name: '🎬 映画', value: `登録: ${movieStats.total}本\n観たい: ${movieStats.wantToWatch}本\n視聴済み: ${movieStats.watched}本`, inline: true },
+      { name: '🎯 活動', value: `登録: ${activityStats.total}件\n予定: ${activityStats.planned}件\n完了: ${activityStats.done}件`, inline: true }
+    )
+    .setTimestamp();
+}
+
+async createWeeklyStats() {
+  const weekStats = await this.getRealWeeklyStats();
+  
+  return new EmbedBuilder()
+    .setTitle('📅 今週の統計')
+    .setColor('#2ecc71')
+    .addFields(
+      { name: '📚 読了', value: `${weekStats.finishedBooks}冊`, inline: true },
+      { name: '🎬 視聴', value: `${weekStats.watchedMovies}本`, inline: true },
+      { name: '🎯 完了', value: `${weekStats.completedActivities}件`, inline: true }
+    )
+    .setTimestamp();
+}
+
+async createMonthlyStats() {
+  const monthStats = await this.getRealMonthlyStats();
+  
+  return new EmbedBuilder()
+    .setTitle('🗓️ 今月の統計')
+    .setColor('#9b59b6')
+    .addFields(
+      { name: '📚 読了', value: `${monthStats.finishedBooks}冊`, inline: true },
+      { name: '🎬 視聴', value: `${monthStats.watchedMovies}本`, inline: true },
+      { name: '🎯 完了', value: `${monthStats.completedActivities}件`, inline: true },
+      { name: '📝 日報', value: `${monthStats.reports}件`, inline: true }
+    )
+    .setTimestamp();
+}
+
+async createBookStats() {
+  const bookStats = await this.getDetailedBookCounts();
+  
+  return new EmbedBuilder()
+    .setTitle('📚 読書統計詳細')
+    .setColor('#e74c3c')
+    .addFields(
+      { name: 'ステータス別', value: `登録済み: ${bookStats.registered}冊\n読書中: ${bookStats.reading}冊\n読了: ${bookStats.finished}冊`, inline: true },
+      { name: '期間別', value: `今月: ${bookStats.thisMonth}冊\n今週: ${bookStats.thisWeek}冊`, inline: true }
+    )
+    .setTimestamp();
+}
+
+async createCurrentStats() {
+  const currentStats = await this.getRealCurrentProgress();
+  
+  const readingList = currentStats.readingBooks.length > 0 
+    ? currentStats.readingBooks.map(book => `• [${book.id}] ${book.title}`).join('\n')
+    : 'なし';
+  
+  const movieList = currentStats.wantToWatchMovies.length > 0
+    ? currentStats.wantToWatchMovies.slice(0, 5).map(movie => `• [${movie.id}] ${movie.title}`).join('\n')
+    : 'なし';
+  
+  return new EmbedBuilder()
+    .setTitle('⚡ 現在の進行状況')
+    .setColor('#f39c12')
+    .addFields(
+      { name: '📖 読書中', value: readingList, inline: false },
+      { name: '🎬 観たい映画', value: movieList, inline: false }
+    )
+    .setTimestamp();
+}
+
+// データ取得メソッド
+async getBookCounts() {
+  if (!this.auth) return { total: 3, reading: 1, finished: 2, registered: 0 };
+  
+  try {
+    const auth = await this.auth.getClient();
+    const response = await this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'books_master!A:G'
+    });
+    
+    const values = response.data.values || [];
+    const data = values.slice(1); // ヘッダー除く
+    
+    return {
+      total: data.length,
+      reading: data.filter(row => row[5] === 'reading').length,
+      finished: data.filter(row => row[5] === 'finished').length,
+      registered: data.filter(row => row[5] === 'registered').length
+    };
+  } catch (error) {
+    console.error('本の統計取得エラー:', error);
+    return { total: 0, reading: 0, finished: 0, registered: 0 };
+  }
+}
+
+async getMovieCounts() {
+  if (!this.auth) return { total: 2, wantToWatch: 1, watched: 1 };
+  
+  try {
+    const auth = await this.auth.getClient();
+    const response = await this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'movies_master!A:F'
+    });
+    
+    const values = response.data.values || [];
+    const data = values.slice(1);
+    
+    return {
+      total: data.length,
+      wantToWatch: data.filter(row => row[4] === 'want_to_watch').length,
+      watched: data.filter(row => row[4] === 'watched').length
+    };
+  } catch (error) {
+    console.error('映画の統計取得エラー:', error);
+    return { total: 0, wantToWatch: 0, watched: 0 };
+  }
+}
+
+async getActivityCounts() {
+  if (!this.auth) return { total: 1, planned: 1, done: 0 };
+  
+  try {
+    const auth = await this.auth.getClient();
+    const response = await this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'activities_master!A:F'
+    });
+    
+    const values = response.data.values || [];
+    const data = values.slice(1);
+    
+    return {
+      total: data.length,
+      planned: data.filter(row => row[4] === 'planned').length,
+      done: data.filter(row => row[4] === 'done').length
+    };
+  } catch (error) {
+    console.error('活動の統計取得エラー:', error);
+    return { total: 0, planned: 0, done: 0 };
+  }
+}
+
+async getRealWeeklyStats() {
+  const now = new Date();
+  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
+  
+  if (!this.auth) return { finishedBooks: 1, watchedMovies: 0, completedActivities: 1 };
+  
+  try {
+    const auth = await this.auth.getClient();
+    
+    // 今週完了した本・映画・活動をカウント
+    const [booksData, moviesData, activitiesData] = await Promise.all([
+      this.sheets.spreadsheets.values.get({
+        auth, spreadsheetId: this.spreadsheetId, range: 'books_master!A:G'
+      }),
+      this.sheets.spreadsheets.values.get({
+        auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
+      }),
+      this.sheets.spreadsheets.values.get({
+        auth, spreadsheetId: this.spreadsheetId, range: 'activities_master!A:F'
+      })
+    ]);
+    
+    const finishedBooks = booksData.data.values?.slice(1).filter(row => 
+      row[5] === 'finished' && row[6] && row[6] >= weekStartStr
+    ).length || 0;
+    
+    const watchedMovies = moviesData.data.values?.slice(1).filter(row => 
+      row[4] === 'watched' && row[5] && row[5] >= weekStartStr
+    ).length || 0;
+    
+    const completedActivities = activitiesData.data.values?.slice(1).filter(row => 
+      row[4] === 'done' && row[5] && row[5] >= weekStartStr
+    ).length || 0;
+    
+    return { finishedBooks, watchedMovies, completedActivities };
+  } catch (error) {
+    console.error('週次統計取得エラー:', error);
+    return { finishedBooks: 0, watchedMovies: 0, completedActivities: 0 };
+  }
+}
+
+async getRealMonthlyStats() {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthStartStr = monthStart.toISOString().slice(0, 10);
+  
+  if (!this.auth) return { finishedBooks: 2, watchedMovies: 1, completedActivities: 1, reports: 5 };
+  
+  try {
+    const auth = await this.auth.getClient();
+    
+    const [booksData, moviesData, activitiesData, reportsData] = await Promise.all([
+      this.sheets.spreadsheets.values.get({
+        auth, spreadsheetId: this.spreadsheetId, range: 'books_master!A:G'
+      }),
+      this.sheets.spreadsheets.values.get({
+        auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
+      }),
+      this.sheets.spreadsheets.values.get({
+        auth, spreadsheetId: this.spreadsheetId, range: 'activities_master!A:F'
+      }),
+      this.sheets.spreadsheets.values.get({
+        auth, spreadsheetId: this.spreadsheetId, range: 'daily_reports!A:E'
+      })
+    ]);
+    
+    const finishedBooks = booksData.data.values?.slice(1).filter(row => 
+      row[5] === 'finished' && row[6] && row[6] >= monthStartStr
+    ).length || 0;
+    
+    const watchedMovies = moviesData.data.values?.slice(1).filter(row => 
+      row[4] === 'watched' && row[5] && row[5] >= monthStartStr
+    ).length || 0;
+    
+    const completedActivities = activitiesData.data.values?.slice(1).filter(row => 
+      row[4] === 'done' && row[5] && row[5] >= monthStartStr
+    ).length || 0;
+    
+    const reports = reportsData.data.values?.slice(1).filter(row => 
+      row[1] && row[1] >= monthStartStr
+    ).length || 0;
+    
+    return { finishedBooks, watchedMovies, completedActivities, reports };
+  } catch (error) {
+    console.error('月次統計取得エラー:', error);
+    return { finishedBooks: 0, watchedMovies: 0, completedActivities: 0, reports: 0 };
+  }
+}
+
+async getDetailedBookCounts() {
+  const baseStats = await this.getBookCounts();
+  const weeklyStats = await this.getRealWeeklyStats();
+  const monthlyStats = await this.getRealMonthlyStats();
+  
+  return {
+    ...baseStats,
+    thisWeek: weeklyStats.finishedBooks,
+    thisMonth: monthlyStats.finishedBooks
+  };
+}
+
+async getRealCurrentProgress() {
+  if (!this.auth) return {
+    readingBooks: [{ id: 1, title: 'テスト本' }],
+    wantToWatchMovies: [{ id: 1, title: 'テスト映画' }]
+  };
+  
+  try {
+    const auth = await this.auth.getClient();
+    
+    const [booksData, moviesData] = await Promise.all([
+      this.sheets.spreadsheets.values.get({
+        auth, spreadsheetId: this.spreadsheetId, range: 'books_master!A:G'
+      }),
+      this.sheets.spreadsheets.values.get({
+        auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
+      })
+    ]);
+    
+    const readingBooks = booksData.data.values?.slice(1)
+      .filter(row => row[5] === 'reading')
+      .map(row => ({ id: row[0], title: row[2] })) || [];
+    
+    const wantToWatchMovies = moviesData.data.values?.slice(1)
+      .filter(row => row[4] === 'want_to_watch')
+      .map(row => ({ id: row[0], title: row[2] })) || [];
+    
+    return { readingBooks, wantToWatchMovies };
+  } catch (error) {
+    console.error('進行状況取得エラー:', error);
+    return { readingBooks: [], wantToWatchMovies: [] };
+  }
+}
 
   start() {
     this.client.login(process.env.DISCORD_TOKEN);
