@@ -982,10 +982,17 @@ async sendMorningReminder() {
 
 async sendWeeklyReport() {
   try {
+    console.log('=== 週次レポート開始 ===');
+    
     const weeklyStats = await this.getThisWeekStats();
+    console.log('週次統計取得完了:', weeklyStats);
+    
     const channel = this.getNotificationChannel();
+    console.log('チャンネル取得:', channel ? `${channel.name} (${channel.id})` : 'チャンネルが見つかりません');
     
     if (channel) {
+      console.log('embed作成開始...');
+      
       const embed = new EmbedBuilder()
         .setTitle('📅 今週の活動レポート')
         .setDescription('今週も頑張りました！🎉')
@@ -998,11 +1005,16 @@ async sendWeeklyReport() {
         .setFooter({ text: 'お疲れ様でした！来週も頑張りましょう！' })
         .setTimestamp();
       
+      console.log('embed作成完了、送信開始...');
+      
       await channel.send({ embeds: [embed] });
       console.log('週次レポートを送信しました');
+    } else {
+      console.log('通知チャンネルが見つからないため、週次レポートを送信できませんでした');
     }
   } catch (error) {
     console.error('週次レポートエラー:', error);
+    console.error('エラースタック:', error.stack);
   }
 }
 
@@ -1490,14 +1502,22 @@ async getActivityCounts() {
 }
 
 async getRealWeeklyStats() {
+  console.log('=== 週次統計取得開始 ===');
+  
   const now = new Date();
   const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
   const weekStartStr = weekStart.toISOString().slice(0, 10);
   
-  if (!this.auth) return { finishedBooks: 1, watchedMovies: 0, completedActivities: 1 };
+  console.log('今週の開始日:', weekStartStr);
+  
+  if (!this.auth) {
+    console.log('認証なし - テストデータを返します');
+    return { finishedBooks: 1, watchedMovies: 0, completedActivities: 1 };
+  }
   
   try {
     const auth = await this.auth.getClient();
+    console.log('Google認証成功');
     
     // 今週完了した本・映画・活動をカウント
     const [booksData, moviesData, activitiesData] = await Promise.all([
@@ -1512,6 +1532,8 @@ async getRealWeeklyStats() {
       })
     ]);
     
+    console.log('スプレッドシートデータ取得完了');
+    
     const finishedBooks = booksData.data.values?.slice(1).filter(row => 
       row[5] === 'finished' && row[6] && row[6] >= weekStartStr
     ).length || 0;
@@ -1524,7 +1546,10 @@ async getRealWeeklyStats() {
       row[4] === 'done' && row[5] && row[5] >= weekStartStr
     ).length || 0;
     
-    return { finishedBooks, watchedMovies, completedActivities };
+    const result = { finishedBooks, watchedMovies, completedActivities };
+    console.log('週次統計結果:', result);
+    
+    return result;
   } catch (error) {
     console.error('週次統計取得エラー:', error);
     return { finishedBooks: 0, watchedMovies: 0, completedActivities: 0 };
