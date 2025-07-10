@@ -44,11 +44,15 @@ class ActivityTrackerBot {
     }
     
     this.spreadsheetId = process.env.SPREADSHEET_ID;
+    
+    console.log('setupCommands を呼び出しています...');
     this.setupCommands();
     this.setupEvents();
   }
 
   async setupCommands() {
+    console.log('setupCommands メソッドが呼ばれました');
+    
     const commands = [
       // 本管理
       new SlashCommandBuilder()
