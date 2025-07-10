@@ -1063,6 +1063,29 @@ class CalendarBird {
     }
   }
 
+  // calendar-bird.js に追加
+setupCronJob() {
+    // 既存のcronジョブ...
+    
+    // 毎週金曜日に生存確認を送信
+    cron.schedule('0 0 * * 5', async () => {
+        const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
+        if (channel) {
+            await channel.send({
+                content: `🤖 **サーバー生存確認**\n🕐 JST: ${this.formatJSTDate(new Date(), true)}\n📊 稼働時間: ${process.uptime()}秒`,
+                embeds: [{
+                    title: "Oracle Cloud サーバー状態",
+                    description: "サーバーは正常に動作しています",
+                    color: 0x00ff00,
+                    timestamp: new Date()
+                }]
+            });
+        }
+    }, {
+        timezone: 'Asia/Tokyo'
+    });
+}
+
   async registerCommands() {
     const commands = [
       new SlashCommandBuilder()
