@@ -154,8 +154,24 @@ class ActivityTrackerBot {
       console.log(`${this.client.user.tag} でログインしました！`);
       
       try {
+        // グローバルコマンドをクリア
+        await this.client.application.commands.set([]);
+        console.log('既存のグローバルコマンドをクリアしました');
+        
+        // 特定のギルド（サーバー）にコマンドを登録（即座に反映される）
+        const guild = this.client.guilds.cache.first(); // 最初のサーバー
+        if (guild) {
+          await guild.commands.set(commands);
+          console.log(`ギルド "${guild.name}" にコマンドを登録しました`);
+        }
+        
+        // グローバルコマンドも登録（反映に時間がかかる場合がある）
         await this.client.application.commands.set(commands);
-        console.log('コマンドを登録しました');
+        console.log('グローバルコマンドを登録しました');
+        
+        // 登録されたコマンド一覧を表示
+        const registeredCommands = await this.client.application.commands.fetch();
+        console.log('登録されたコマンド:', registeredCommands.map(cmd => cmd.name).join(', '));
       } catch (error) {
         console.error('コマンド登録エラー:', error);
       }
