@@ -908,11 +908,23 @@ class CalendarBird {
         const dayEvents = eventsByDate[date];
         const displayEvents = dayEvents.slice(0, maxEventsPerDay);
 
-        // 曜日を取得
-        const dayOfWeek = new Date(date + 'T00:00:00').toLocaleDateString('ja-JP', { 
-          weekday: 'short',
-          timeZone: 'Asia/Tokyo'
-        });
+        // 🔥 曜日取得を修正
+        let dayOfWeek;
+        try {
+          // YYYY/MM/DD形式の日付をYYYY-MM-DD形式に変換
+          const normalizedDate = date.replace(/\//g, '-');
+          const dateObj = new Date(normalizedDate + 'T12:00:00'); // 正午を指定してタイムゾーンの問題を回避
+          
+          dayOfWeek = dateObj.toLocaleDateString('ja-JP', { 
+            weekday: 'short',
+            timeZone: 'Asia/Tokyo'
+          });
+          
+          console.log(`📅 日付変換: ${date} → ${normalizedDate} → 曜日: ${dayOfWeek}`);
+        } catch (error) {
+          console.error(`❌ 曜日取得エラー (${date}):`, error);
+          dayOfWeek = '?';
+        }
 
         let dayText = '';
         displayEvents.forEach(event => {
