@@ -379,7 +379,9 @@ setupEvents() {
       
       case 'skip':
   const skipId = interaction.options.getInteger('id');
+  console.log('=== skip コマンド開始 ===', skipId);
   const skippedMovie = await this.skipMovie(skipId);
+  console.log('skipMovie から返された結果:', skippedMovie);
   if (skippedMovie) {
     const memoText = skippedMovie.memo ? `\n備考: ${skippedMovie.memo}` : '';
     await interaction.reply(`😅 見逃してしまいました\nタイトル: ${skippedMovie.title}\nID: ${skippedMovie.id}${memoText}\n\n😅 見逃してしまいましたね。また機会があったら見てみてください！`);
