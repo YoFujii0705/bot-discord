@@ -705,13 +705,14 @@ async addMovie(title, memo) {
   }
 
   async watchMovie(id) {
-    await this.updateMovieStatus(id, 'watched');
-  }
+  const movieInfo = await this.updateMovieStatus(id, 'watched');
+  return movieInfo;
+}
 
   async skipMovie(id) {
-    await this.updateMovieStatus(id, 'missed');
-  }
-
+  const movieInfo = await this.updateMovieStatus(id, 'missed');
+  return movieInfo;
+}
   async updateMovieStatus(id, status) {
   if (!this.auth) {
     return { id, title: 'テスト映画', memo: 'テストメモ' };
