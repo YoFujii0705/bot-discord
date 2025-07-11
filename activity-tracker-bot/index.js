@@ -711,11 +711,7 @@ async addMovie(title, memo) {
   }
 
   async updateMovieStatus(id, status) {
-  console.log('=== updateMovieStatus 開始 ===');
-  console.log('受け取ったパラメータ:', { id, status, idType: typeof id });
-  
   if (!this.auth) {
-    console.log('認証なし - テストデータを返します');
     return { id, title: 'テスト映画', memo: 'テストメモ' };
   }
   
@@ -723,7 +719,6 @@ async addMovie(title, memo) {
   const date = new Date().toISOString().slice(0, 10);
   
   try {
-    console.log('スプレッドシートからデータ取得中...');
     const response = await this.sheets.spreadsheets.values.get({
       auth,
       spreadsheetId: this.spreadsheetId,
@@ -731,33 +726,19 @@ async addMovie(title, memo) {
     });
     
     const values = response.data.values || [];
-    console.log('取得したデータ行数:', values.length);
-    
-    // 全データをログ出力（最初の5行だけ）
-    console.log('データサンプル:', values.slice(0, 5));
-    
-    const rowIndex = values.findIndex(row => {
-      console.log(`比較: row[0]="${row[0]}" (${typeof row[0]}) vs id="${id}" (${typeof id})`);
-      return row[0] == id;
-    });
-    
-    console.log('見つかった行のインデックス:', rowIndex);
+    const rowIndex = values.findIndex(row => row[0] == id);
     
     if (rowIndex !== -1) {
       const row = values[rowIndex];
-      console.log('見つかった行のデータ:', row);
       
-      // 映画情報を先に保存
+      // 先に映画情報を保存
       const movieInfo = {
         id: row[0],
         title: row[2] || '不明なタイトル',
         memo: row[3] || ''
       };
       
-      console.log('作成した映画情報:', movieInfo);
-      
       // ステータス更新
-      console.log('ステータス更新中...');
       await this.sheets.spreadsheets.values.update({
         auth,
         spreadsheetId: this.spreadsheetId,
@@ -768,20 +749,14 @@ async addMovie(title, memo) {
         }
       });
       
-      console.log('ステータス更新完了、映画情報を返します');
       return movieInfo;
-    } else {
-      console.log('指定されたIDの映画が見つかりませんでした');
-      console.log('検索対象のID:', id);
-      console.log('利用可能なIDリスト:', values.slice(1).map(row => row[0]));
     }
   } catch (error) {
     console.error('映画ステータス更新エラー:', error);
   }
   
   return null;
-}
-	
+}	
   async getMovies() {
     if (!this.auth) return ['🎬 [1] テスト映画 (want_to_watch)'];
     
