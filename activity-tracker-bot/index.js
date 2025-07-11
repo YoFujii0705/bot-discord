@@ -359,49 +359,20 @@ setupEvents() {
     }
   }
 
-  async handleMovieCommand(interaction) {
-    const subcommand = interaction.options.getSubcommand();
-    
-    switch (subcommand) {
-      case 'add':
-        const title = interaction.options.getString('title');
-        const memo = interaction.options.getString('memo') || '';
-        
-        const movieId = await this.addMovie(title, memo);
-        await interaction.reply(`🎬 映画を追加しました！\nID: ${movieId}\nタイトル: ${title}`);
-        break;
-      
-      case 'watch':
-        const watchId = interaction.options.getInteger('id');
-        await this.watchMovie(watchId);
-        await interaction.reply(`🎬 視聴済みにしました！面白かったですか？`);
-        break;
-      
-      case 'skip':
+  case 'skip':
   const skipId = interaction.options.getInteger('id');
   console.log('=== skip コマンド開始 ===', skipId);
   const skippedMovie = await this.skipMovie(skipId);
-  console.log('skipMovie から返された結果:', skippedMovie);
+  console.log('=== skipMovie から戻った結果 ===', skippedMovie);
   if (skippedMovie) {
+    console.log('=== 映画情報がある場合の処理 ===');
     const memoText = skippedMovie.memo ? `\n備考: ${skippedMovie.memo}` : '';
     await interaction.reply(`😅 見逃してしまいました\nタイトル: ${skippedMovie.title}\nID: ${skippedMovie.id}${memoText}\n\n😅 見逃してしまいましたね。また機会があったら見てみてください！`);
   } else {
+    console.log('=== 映画情報がない場合の処理 ===');
     await interaction.reply('指定されたIDの映画が見つかりませんでした。');
   }
   break;
-      
-      case 'list':
-        const movies = await this.getMovies();
-        const embed = new EmbedBuilder()
-          .setTitle('🎬 映画一覧')
-          .setColor('#ff6b6b')
-          .setDescription(movies.length > 0 ? movies.join('\n') : '登録されている映画はありません');
-        
-        await interaction.reply({ embeds: [embed] });
-        break;
-    }
-  }
-
   async handleActivityCommand(interaction) {
     const subcommand = interaction.options.getSubcommand();
     
@@ -710,7 +681,9 @@ async addMovie(title, memo) {
 }
 
   async skipMovie(id) {
+  console.log('=== skipMovie 開始 ===', id);
   const movieInfo = await this.updateMovieStatus(id, 'missed');
+  console.log('=== skipMovie が受け取った結果 ===', movieInfo);
   return movieInfo;
 }
   async updateMovieStatus(id, status) {
@@ -969,27 +942,6 @@ async addDailyReport(category, id, content) {
     }, {
       timezone: "Asia/Tokyo"
     });
-
-　　// テスト用: 1分後に各通知をテスト実行
-setTimeout(async () => {
-  console.log('=== 朝の通知テスト ===');
-  await this.sendMorningReminder();
-}, 60000); // 1分後
-
-setTimeout(async () => {
-  console.log('=== 週次レポートテスト ===');
-  await this.sendWeeklyReport();
-}, 120000); // 2分後
-
-setTimeout(async () => {
-  console.log('=== 月次レポートテスト ===');
-  await this.sendMonthlyReport();
-}, 180000); // 3分後
-
-setTimeout(async () => {
-  console.log('=== 放置アラートテスト ===');
-  await this.checkAbandonedItems();
-}, 240000); // 4分後
     
     console.log('定期通知機能が有効になりました');
   }
