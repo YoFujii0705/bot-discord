@@ -717,9 +717,7 @@ async addMovie(title, memo) {
 }
 
   async skipMovie(id) {
-  console.log('=== skipMovie 開始 ===', id);
   const movieInfo = await this.updateMovieStatus(id, 'missed');
-  console.log('=== skipMovie が受け取った結果 ===', movieInfo);
   return movieInfo;
 }
 	
