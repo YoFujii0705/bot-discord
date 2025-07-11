@@ -47,226 +47,250 @@ class ActivityTrackerBot {
     this.setupScheduledTasks();
   }
 
-setupCommands() {
-    console.log('setupCommands開始');
+buildCommands() {
+  console.log('コマンド定義開始');
+  
+  const commands = [];
+  
+  // 本管理コマンド
+  const bookCommand = new SlashCommandBuilder()
+    .setName('book')
+    .setDescription('本の管理')
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('add')
+        .setDescription('本を追加')
+        .addStringOption(option =>
+          option.setName('title').setDescription('タイトル').setRequired(true))
+        .addStringOption(option =>
+          option.setName('author').setDescription('作者').setRequired(true))
+        .addStringOption(option =>
+          option.setName('memo').setDescription('備考').setRequired(false)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('start')
+        .setDescription('読み始める')
+        .addIntegerOption(option =>
+          option.setName('id').setDescription('本のID').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('finish')
+        .setDescription('読み終わる')
+        .addIntegerOption(option =>
+          option.setName('id').setDescription('本のID').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand.setName('list').setDescription('本一覧'));
+
+  commands.push(bookCommand);
+
+  // 映画管理コマンド
+  const movieCommand = new SlashCommandBuilder()
+    .setName('movie')
+    .setDescription('映画の管理')
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('add')
+        .setDescription('映画を追加')
+        .addStringOption(option =>
+          option.setName('title').setDescription('タイトル').setRequired(true))
+        .addStringOption(option =>
+          option.setName('memo').setDescription('備考').setRequired(false)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('watch')
+        .setDescription('視聴済みにする')
+        .addIntegerOption(option =>
+          option.setName('id').setDescription('映画のID').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('skip')
+        .setDescription('見逃した')
+        .addIntegerOption(option =>
+          option.setName('id').setDescription('映画のID').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand.setName('list').setDescription('映画一覧'));
+
+  commands.push(movieCommand);
+
+  // 活動管理コマンド
+  const activityCommand = new SlashCommandBuilder()
+    .setName('activity')
+    .setDescription('活動の管理')
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('add')
+        .setDescription('活動を追加')
+        .addStringOption(option =>
+          option.setName('content').setDescription('活動内容').setRequired(true))
+        .addStringOption(option =>
+          option.setName('memo').setDescription('備考').setRequired(false)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('done')
+        .setDescription('実行済みにする')
+        .addIntegerOption(option =>
+          option.setName('id').setDescription('活動のID').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('skip')
+        .setDescription('やり逃した')
+        .addIntegerOption(option =>
+          option.setName('id').setDescription('活動のID').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand.setName('list').setDescription('活動一覧'));
+
+  commands.push(activityCommand);
+
+  // 日報コマンド
+  const reportCommand = new SlashCommandBuilder()
+    .setName('report')
+    .setDescription('日報を記録')
+    .addStringOption(option =>
+      option.setName('category').setDescription('カテゴリ').setRequired(true)
+        .addChoices(
+          { name: '本', value: 'book' },
+          { name: '映画', value: 'movie' },
+          { name: '活動', value: 'activity' }
+        ))
+    .addIntegerOption(option =>
+      option.setName('id').setDescription('対象のID').setRequired(true))
+    .addStringOption(option =>
+      option.setName('content').setDescription('内容').setRequired(true));
+
+  commands.push(reportCommand);
+
+  // 統計コマンド
+  const statsCommand = new SlashCommandBuilder()
+    .setName('stats')
+    .setDescription('統計情報を表示')
+    .addSubcommand(subcommand =>
+      subcommand.setName('summary').setDescription('全体統計'))
+    .addSubcommand(subcommand =>
+      subcommand.setName('weekly').setDescription('週次統計'))
+    .addSubcommand(subcommand =>
+      subcommand.setName('monthly').setDescription('月次統計'))
+    .addSubcommand(subcommand =>
+      subcommand.setName('books').setDescription('読書統計'))
+    .addSubcommand(subcommand =>
+      subcommand.setName('current').setDescription('現在進行中'));
+
+  commands.push(statsCommand);
+
+  // 検索コマンド
+  const searchCommand = new SlashCommandBuilder()
+    .setName('search')
+    .setDescription('アイテムを検索')
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('book')
+        .setDescription('本を検索')
+        .addStringOption(option =>
+          option.setName('keyword').setDescription('検索キーワード（タイトルまたは作者）').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('movie')
+        .setDescription('映画を検索')
+        .addStringOption(option =>
+          option.setName('keyword').setDescription('検索キーワード（タイトル）').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('activity')
+        .setDescription('活動を検索')
+        .addStringOption(option =>
+          option.setName('keyword').setDescription('検索キーワード（活動内容）').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('all')
+        .setDescription('全てから検索')
+        .addStringOption(option =>
+          option.setName('keyword').setDescription('検索キーワード').setRequired(true)));
+
+  commands.push(searchCommand);
+
+  console.log('定義されたコマンド:', commands.map(cmd => cmd.name));
+  return commands;
+}
+
+async deployCommands() {
+  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+  
+  try {
+    console.log('スラッシュコマンドの登録を開始しています...');
     
-    const commands = [];
+    // コマンドをJSON形式に変換
+    const commandsData = this.commands.map(command => command.toJSON());
     
-    // 本管理コマンド
-    const bookCommand = new SlashCommandBuilder()
-      .setName('book')
-      .setDescription('本の管理')
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('add')
-          .setDescription('本を追加')
-          .addStringOption(option =>
-            option.setName('title').setDescription('タイトル').setRequired(true))
-          .addStringOption(option =>
-            option.setName('author').setDescription('作者').setRequired(true))
-          .addStringOption(option =>
-            option.setName('memo').setDescription('備考').setRequired(false)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('start')
-          .setDescription('読み始める')
-          .addIntegerOption(option =>
-            option.setName('id').setDescription('本のID').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('finish')
-          .setDescription('読み終わる')
-          .addIntegerOption(option =>
-            option.setName('id').setDescription('本のID').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand.setName('list').setDescription('本一覧'));
+    // グローバルコマンドとして登録（全サーバーで利用可能）
+    await rest.put(
+      Routes.applicationCommands(this.client.user.id),
+      { body: commandsData },
+    );
 
-    commands.push(bookCommand);
-
-    // 映画管理コマンド
-    const movieCommand = new SlashCommandBuilder()
-      .setName('movie')
-      .setDescription('映画の管理')
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('add')
-          .setDescription('映画を追加')
-          .addStringOption(option =>
-            option.setName('title').setDescription('タイトル').setRequired(true))
-          .addStringOption(option =>
-            option.setName('memo').setDescription('備考').setRequired(false)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('watch')
-          .setDescription('視聴済みにする')
-          .addIntegerOption(option =>
-            option.setName('id').setDescription('映画のID').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('skip')
-          .setDescription('見逃した')
-          .addIntegerOption(option =>
-            option.setName('id').setDescription('映画のID').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand.setName('list').setDescription('映画一覧'));
-
-    commands.push(movieCommand);
-
-    // 活動管理コマンド
-    const activityCommand = new SlashCommandBuilder()
-      .setName('activity')
-      .setDescription('活動の管理')
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('add')
-          .setDescription('活動を追加')
-          .addStringOption(option =>
-            option.setName('content').setDescription('活動内容').setRequired(true))
-          .addStringOption(option =>
-            option.setName('memo').setDescription('備考').setRequired(false)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('done')
-          .setDescription('実行済みにする')
-          .addIntegerOption(option =>
-            option.setName('id').setDescription('活動のID').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('skip')
-          .setDescription('やり逃した')
-          .addIntegerOption(option =>
-            option.setName('id').setDescription('活動のID').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand.setName('list').setDescription('活動一覧'));
-
-    commands.push(activityCommand);
-
-    // 日報コマンド
-    const reportCommand = new SlashCommandBuilder()
-      .setName('report')
-      .setDescription('日報を記録')
-      .addStringOption(option =>
-        option.setName('category').setDescription('カテゴリ').setRequired(true)
-          .addChoices(
-            { name: '本', value: 'book' },
-            { name: '映画', value: 'movie' },
-            { name: '活動', value: 'activity' }
-          ))
-      .addIntegerOption(option =>
-        option.setName('id').setDescription('対象のID').setRequired(true))
-      .addStringOption(option =>
-        option.setName('content').setDescription('内容').setRequired(true));
-
-    commands.push(reportCommand);
-
-    // 統計コマンド
-    const statsCommand = new SlashCommandBuilder()
-      .setName('stats')
-      .setDescription('統計情報を表示')
-      .addSubcommand(subcommand =>
-        subcommand.setName('summary').setDescription('全体統計'))
-      .addSubcommand(subcommand =>
-        subcommand.setName('weekly').setDescription('週次統計'))
-      .addSubcommand(subcommand =>
-        subcommand.setName('monthly').setDescription('月次統計'))
-      .addSubcommand(subcommand =>
-        subcommand.setName('books').setDescription('読書統計'))
-      .addSubcommand(subcommand =>
-        subcommand.setName('current').setDescription('現在進行中'));
-
-    commands.push(statsCommand);
-
-// 検索コマンド
-    const searchCommand = new SlashCommandBuilder()
-      .setName('search')
-      .setDescription('アイテムを検索')
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('book')
-          .setDescription('本を検索')
-          .addStringOption(option =>
-            option.setName('keyword').setDescription('検索キーワード（タイトルまたは作者）').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('movie')
-          .setDescription('映画を検索')
-          .addStringOption(option =>
-            option.setName('keyword').setDescription('検索キーワード（タイトル）').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('activity')
-          .setDescription('活動を検索')
-          .addStringOption(option =>
-            option.setName('keyword').setDescription('検索キーワード（活動内容）').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('all')
-          .setDescription('全てから検索')
-          .addStringOption(option =>
-            option.setName('keyword').setDescription('検索キーワード').setRequired(true)));
-
-    commands.push(searchCommand);
-
-    console.log('定義されたコマンド:', commands.map(cmd => cmd.name));
-
-    // Discord接続時の処理
-    this.client.on('ready', async () => {
-      console.log(`${this.client.user.tag} でログインしました！`);
-      
-      try {
-        await this.client.application.commands.set([]);
-        console.log('既存のグローバルコマンドをクリアしました');
-        
-        const guild = this.client.guilds.cache.first();
-        if (guild) {
-          await guild.commands.set(commands);
-          console.log(`ギルド "${guild.name}" にコマンドを登録しました`);
-        }
-        
-        await this.client.application.commands.set(commands);
-        console.log('グローバルコマンドを登録しました');
-        
-        const registeredCommands = await this.client.application.commands.fetch();
-        console.log('登録されたコマンド:', registeredCommands.map(cmd => cmd.name).join(', '));
-      } catch (error) {
-        console.error('コマンド登録エラー:', error);
-      }
-    });
+    console.log('✅ スラッシュコマンドの登録が完了しました');
+  } catch (error) {
+    console.error('❌ スラッシュコマンドの登録に失敗しました:', error);
   }
+}
+	
 setupEvents() {
-    this.client.on('interactionCreate', async interaction => {
-      if (!interaction.isChatInputCommand()) return;
+  // Discord接続時の処理
+  this.client.once('ready', async () => {
+    console.log(`✅ ${this.client.user.tag} でログインしました！`);
+    
+    // コマンドを登録
+    await this.deployCommands();
+  });
 
-      try {
-        const { commandName } = interaction;
-        
-        switch (commandName) {
-          case 'book':
-            await this.handleBookCommand(interaction);
-            break;
-          case 'movie':
-            await this.handleMovieCommand(interaction);
-            break;
-          case 'activity':
-            await this.handleActivityCommand(interaction);
-            break;
-          case 'report':
-            await this.handleReportCommand(interaction);
-            break;
-          case 'stats':
-            await this.handleStatsCommand(interaction);
-            break;
-	  case 'search':
-            await this.handleSearchCommand(interaction);
-            break;
-        }
-      } catch (error) {
-        console.error('エラー:', error);
-        await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
+  // インタラクション処理
+  this.client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+
+    try {
+      const { commandName } = interaction;
+      
+      switch (commandName) {
+        case 'book':
+          await this.handleBookCommand(interaction);
+          break;
+        case 'movie':
+          await this.handleMovieCommand(interaction);
+          break;
+        case 'activity':
+          await this.handleActivityCommand(interaction);
+          break;
+        case 'report':
+          await this.handleReportCommand(interaction);
+          break;
+        case 'stats':
+          await this.handleStatsCommand(interaction);
+          break;
+        case 'search':
+          await this.handleSearchCommand(interaction);
+          break;
+        default:
+          await interaction.reply({ content: '不明なコマンドです。', ephemeral: true });
       }
-    });
-  }
+    } catch (error) {
+      console.error('❌ コマンド実行エラー:', error);
+      if (!interaction.replied && !interaction.deferred) {
+        try {
+          await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
+        } catch (replyError) {
+          console.error('❌ エラー応答の送信に失敗:', replyError);
+        }
+      }
+    }
+  });
 
+  // エラーハンドリング
+  this.client.on('error', error => {
+    console.error('❌ Discord.js エラー:', error);
+  });
+
+  this.client.on('warn', info => {
+    console.warn('⚠️ Discord.js 警告:', info);
+  });
+}
   async handleBookCommand(interaction) {
     const subcommand = interaction.options.getSubcommand();
     
