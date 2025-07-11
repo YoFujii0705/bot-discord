@@ -687,15 +687,62 @@ async addMovie(title, memo) {
   }
 
   async updateMovieStatus(id, status) {
-  console.log('=== updateMovieStatus が呼ばれました ===');
-  console.log('ID:', id, 'Status:', status);
+  console.log('=== updateMovieStatus 開始 ===', { id, status });
   
-  // とりあえず固定の情報を返すテスト
-  return {
-    id: id,
-    title: '映画タイトル取得テスト',
-    memo: 'メモテスト'
-  };
+  if (!this.auth) {
+    return { id, title: 'テスト映画', memo: 'テストメモ' };
+  }
+  
+  const auth = await this.auth.getClient();
+  const date = new Date().toISOString().slice(0, 10);
+  
+  try {
+    // まず映画情報を取得
+    const response = await this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'movies_master!A:F'
+    });
+    
+    const values = response.data.values || [];
+    const rowIndex = values.findIndex(row => row[0] == id);
+    
+    console.log('映画検索結果:', { rowIndex, totalRows: values.length });
+    
+    if (rowIndex !== -1) {
+      const row = values[rowIndex];
+      console.log('見つかった映画データ:', row);
+      
+      // 映画情報を先に保存
+      const movieInfo = {
+        id: row[0],
+        title: row[2] || '不明なタイトル',
+        memo: row[3] || ''
+      };
+      
+      console.log('返す映画情報:', movieInfo);
+      
+      // ステータス更新
+      await this.sheets.spreadsheets.values.update({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range: `movies_master!E${rowIndex + 1}:F${rowIndex + 1}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[status, date]]
+        }
+      });
+      
+      console.log('ステータス更新完了');
+      return movieInfo;
+    } else {
+      console.log('指定されたIDの映画が見つかりません:', id);
+    }
+  } catch (error) {
+    console.error('映画ステータス更新エラー:', error);
+  }
+  
+  return null;
 }
 	
   async getMovies() {
