@@ -687,56 +687,17 @@ async addMovie(title, memo) {
   }
 
   async updateMovieStatus(id, status) {
-  if (!this.auth) {
-    return { id, title: 'テスト映画', memo: 'テストメモ' };
-  }
+  console.log('=== updateMovieStatus が呼ばれました ===');
+  console.log('ID:', id, 'Status:', status);
   
-  const auth = await this.auth.getClient();
-  const date = new Date().toISOString().slice(0, 10);
-  
-  try {
-    const response = await this.sheets.spreadsheets.values.get({
-      auth,
-      spreadsheetId: this.spreadsheetId,
-      range: 'movies_master!A:F'
-    });
-    
-    const values = response.data.values || [];
-    const rowIndex = values.findIndex(row => row[0] == id);
-    
-    if (rowIndex !== -1) {
-      const row = values[rowIndex];
-      
-      // 先に映画情報を取得してから更新
-      const movieInfo = {
-        id: row[0],
-        title: row[2],
-        memo: row[3] || ''
-      };
-      
-      // ステータス更新
-      await this.sheets.spreadsheets.values.update({
-        auth,
-        spreadsheetId: this.spreadsheetId,
-        range: `movies_master!E${rowIndex + 1}:F${rowIndex + 1}`,
-        valueInputOption: 'RAW',
-        resource: {
-          values: [[status, date]]
-        }
-      });
-      
-      console.log('映画情報を返します:', movieInfo); // デバッグログ
-      return movieInfo;
-    } else {
-      console.log('映画が見つかりませんでした。ID:', id); // デバッグログ
-    }
-  } catch (error) {
-    console.error('映画ステータス更新エラー:', error);
-  }
-  
-  return null;
+  // とりあえず固定の情報を返すテスト
+  return {
+    id: id,
+    title: '映画タイトル取得テスト',
+    memo: 'メモテスト'
+  };
 }
-
+	
   async getMovies() {
     if (!this.auth) return ['🎬 [1] テスト映画 (want_to_watch)'];
     
