@@ -385,15 +385,35 @@ class ActivityTrackerBot {
       break;
     
     case 'skip':
-      const skipId = interaction.options.getInteger('id');
-      const skippedMovie = await this.skipMovie(skipId);
-      if (skippedMovie) {
-        const memoText = skippedMovie.memo ? `\n備考: ${skippedMovie.memo}` : '';
-        await interaction.reply(`😅 見逃してしまいました\nタイトル: ${skippedMovie.title}\nID: ${skippedMovie.id}${memoText}\n\n😅 見逃してしまいましたね。また機会があったら見てみてください！`);
-      } else {
-        await interaction.reply('指定されたIDの映画が見つかりませんでした。');
-      }
-      break;
+  const skipId = interaction.options.getInteger('id');
+  console.log('=== デバッグ: skipMovie開始 ===');
+  console.log('受け取ったID:', skipId);
+  
+  try {
+    const skippedMovie = await this.skipMovie(skipId);
+    console.log('skipMovieから返された結果:', skippedMovie);
+    
+    if (skippedMovie) {
+      console.log('映画情報が取得できました:', {
+        id: skippedMovie.id,
+        title: skippedMovie.title,
+        memo: skippedMovie.memo
+      });
+      
+      const memoText = skippedMovie.memo ? `\n備考: ${skippedMovie.memo}` : '';
+      const message = `😅 見逃してしまいました\nタイトル: ${skippedMovie.title}\nID: ${skippedMovie.id}${memoText}\n\n😅 見逃してしまいましたね。また機会があったら見てみてください！`;
+      
+      console.log('送信するメッセージ:', message);
+      await interaction.reply(message);
+    } else {
+      console.log('映画情報が取得できませんでした');
+      await interaction.reply('指定されたIDの映画が見つかりませんでした。');
+    }
+  } catch (error) {
+    console.error('skipMovieでエラーが発生:', error);
+    await interaction.reply('エラーが発生しました: ' + error.message);
+  }
+  break;
     
     case 'list':
       const movies = await this.getMovies();
