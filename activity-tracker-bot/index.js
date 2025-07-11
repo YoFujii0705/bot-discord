@@ -350,13 +350,13 @@ setupEvents() {
       case 'watch':
         const watchId = interaction.options.getInteger('id');
         await this.watchMovie(watchId);
-        await interaction.reply(`🎬 視聴済みにしました！面白かったですか？`);
+        await interaction.reply(`🎬 視聴済みにしました！面白かったですか？\nID: ${movieId}\nタイトル: ${title}`);
         break;
       
       case 'skip':
         const skipId = interaction.options.getInteger('id');
         await this.skipMovie(skipId);
-        await interaction.reply(`😅 見逃してしまいましたね。また機会があったら見てみてください！`);
+        await interaction.reply(`😅 見逃してしまいましたね。また機会があったら見てみてください！\nID: ${movieId}\nタイトル: ${title}`);
         break;
       
       case 'list':
@@ -386,13 +386,13 @@ setupEvents() {
       case 'done':
         const doneId = interaction.options.getInteger('id');
         await this.doneActivity(doneId);
-        await interaction.reply(`✅ 活動を完了しました！お疲れ様でした！🎉`);
+        await interaction.reply(`✅ 活動を完了しました！お疲れ様でした！🎉\nID: ${activityId}\n内容: ${content}`);
         break;
       
       case 'skip':
         const skipId = interaction.options.getInteger('id');
         await this.skipActivity(skipId);
-        await interaction.reply(`😅 今回は見送りましたね。また機会があればチャレンジしてみてください！`);
+        await interaction.reply(`😅 今回は見送りましたね。また機会があればチャレンジしてみてください！\nID: ${activityId}\n内容: ${content}`);
         break;
       
       case 'list':
