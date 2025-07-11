@@ -42,7 +42,7 @@ class ActivityTrackerBot {
     }
     
     this.spreadsheetId = process.env.SPREADSHEET_ID;
-    this.setupCommands();
+    this.commands = this.buildCommands();
     this.setupEvents();
     this.setupScheduledTasks();
   }
