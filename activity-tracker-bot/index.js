@@ -469,121 +469,6 @@ async handleActivityCommand(interaction) {
   }
 }
 
-// watchMovie メソッドの修正版（映画情報を返すように）
-async watchMovie(id) {
-  const movieInfo = await this.updateMovieStatus(id, 'watched');
-  return movieInfo;
-}
-
-// skipMovie メソッドの修正版（映画情報を返すように）
-async skipMovie(id) {
-  const movieInfo = await this.updateMovieStatus(id, 'missed');
-  return movieInfo;
-}
-
-// doneActivity メソッドの修正版（活動情報を返すように）
-async doneActivity(id) {
-  const activityInfo = await this.updateActivityStatus(id, 'done');
-  return activityInfo;
-}
-
-// skipActivity メソッドの修正版（活動情報を返すように）
-async skipActivity(id) {
-  const activityInfo = await this.updateActivityStatus(id, 'skipped');
-  return activityInfo;
-}
-
-// updateMovieStatus メソッドの修正版（映画情報を返すように）
-async updateMovieStatus(id, status) {
-  if (!this.auth) {
-    return { id, title: 'テスト映画', memo: 'テストメモ' };
-  }
-  
-  const auth = await this.auth.getClient();
-  const date = new Date().toISOString().slice(0, 10);
-  
-  try {
-    const response = await this.sheets.spreadsheets.values.get({
-      auth,
-      spreadsheetId: this.spreadsheetId,
-      range: 'movies_master!A:F'
-    });
-    
-    const values = response.data.values || [];
-    const rowIndex = values.findIndex(row => row[0] == id);
-    
-    if (rowIndex !== -1) {
-      // ステータス更新
-      await this.sheets.spreadsheets.values.update({
-        auth,
-        spreadsheetId: this.spreadsheetId,
-        range: `movies_master!E${rowIndex + 1}:F${rowIndex + 1}`,
-        valueInputOption: 'RAW',
-        resource: {
-          values: [[status, date]]
-        }
-      });
-      
-      // 映画情報を返す
-      const row = values[rowIndex];
-      return {
-        id: row[0],
-        title: row[2],
-        memo: row[3]
-      };
-    }
-  } catch (error) {
-    console.error('映画ステータス更新エラー:', error);
-  }
-  
-  return null;
-}
-
-// updateActivityStatus メソッドの修正版（活動情報を返すように）
-async updateActivityStatus(id, status) {
-  if (!this.auth) {
-    return { id, content: 'テスト活動', memo: 'テストメモ' };
-  }
-  
-  const auth = await this.auth.getClient();
-  const date = new Date().toISOString().slice(0, 10);
-  
-  try {
-    const response = await this.sheets.spreadsheets.values.get({
-      auth,
-      spreadsheetId: this.spreadsheetId,
-      range: 'activities_master!A:F'
-    });
-    
-    const values = response.data.values || [];
-    const rowIndex = values.findIndex(row => row[0] == id);
-    
-    if (rowIndex !== -1) {
-      // ステータス更新
-      await this.sheets.spreadsheets.values.update({
-        auth,
-        spreadsheetId: this.spreadsheetId,
-        range: `activities_master!E${rowIndex + 1}:F${rowIndex + 1}`,
-        valueInputOption: 'RAW',
-        resource: {
-          values: [[status, date]]
-        }
-      });
-      
-      // 活動情報を返す
-      const row = values[rowIndex];
-      return {
-        id: row[0],
-        content: row[2],
-        memo: row[3]
-      };
-    }
-  } catch (error) {
-    console.error('活動ステータス更新エラー:', error);
-  }
-  
-  return null;
-}
   async handleReportCommand(interaction) {
     const category = interaction.options.getString('category');
     const id = interaction.options.getInteger('id');
@@ -845,20 +730,28 @@ async addMovie(title, memo) {
     return id;
   }
 
-  async watchMovie(id) {
-    await this.updateMovieStatus(id, 'watched');
-  }
+  // watchMovie メソッドの修正版（映画情報を返すように）
+async watchMovie(id) {
+  const movieInfo = await this.updateMovieStatus(id, 'watched');
+  return movieInfo;
+}
 
-  async skipMovie(id) {
-    await this.updateMovieStatus(id, 'missed');
-  }
+// skipMovie メソッドの修正版（映画情報を返すように）
+async skipMovie(id) {
+  const movieInfo = await this.updateMovieStatus(id, 'missed');
+  return movieInfo;
+}
 
-  async updateMovieStatus(id, status) {
-    if (!this.auth) return;
-    
-    const auth = await this.auth.getClient();
-    const date = new Date().toISOString().slice(0, 10);
-    
+  // updateMovieStatus メソッドの修正版（映画情報を返すように）
+async updateMovieStatus(id, status) {
+  if (!this.auth) {
+    return { id, title: 'テスト映画', memo: 'テストメモ' };
+  }
+  
+  const auth = await this.auth.getClient();
+  const date = new Date().toISOString().slice(0, 10);
+  
+  try {
     const response = await this.sheets.spreadsheets.values.get({
       auth,
       spreadsheetId: this.spreadsheetId,
@@ -869,6 +762,7 @@ async addMovie(title, memo) {
     const rowIndex = values.findIndex(row => row[0] == id);
     
     if (rowIndex !== -1) {
+      // ステータス更新
       await this.sheets.spreadsheets.values.update({
         auth,
         spreadsheetId: this.spreadsheetId,
@@ -878,8 +772,21 @@ async addMovie(title, memo) {
           values: [[status, date]]
         }
       });
+      
+      // 映画情報を返す
+      const row = values[rowIndex];
+      return {
+        id: row[0],
+        title: row[2],
+        memo: row[3]
+      };
     }
+  } catch (error) {
+    console.error('映画ステータス更新エラー:', error);
   }
+  
+  return null;
+}
 
   async getMovies() {
     if (!this.auth) return ['🎬 [1] テスト映画 (want_to_watch)'];
@@ -924,20 +831,28 @@ async addMovie(title, memo) {
     return id;
   }
 
-  async doneActivity(id) {
-    await this.updateActivityStatus(id, 'done');
-  }
+  // doneActivity メソッドの修正版（活動情報を返すように）
+async doneActivity(id) {
+  const activityInfo = await this.updateActivityStatus(id, 'done');
+  return activityInfo;
+}
 
-  async skipActivity(id) {
-    await this.updateActivityStatus(id, 'skipped');
-  }
+// skipActivity メソッドの修正版（活動情報を返すように）
+async skipActivity(id) {
+  const activityInfo = await this.updateActivityStatus(id, 'skipped');
+  return activityInfo;
+}
 
-  async updateActivityStatus(id, status) {
-    if (!this.auth) return;
-    
-    const auth = await this.auth.getClient();
-    const date = new Date().toISOString().slice(0, 10);
-    
+  // updateActivityStatus メソッドの修正版（活動情報を返すように）
+async updateActivityStatus(id, status) {
+  if (!this.auth) {
+    return { id, content: 'テスト活動', memo: 'テストメモ' };
+  }
+  
+  const auth = await this.auth.getClient();
+  const date = new Date().toISOString().slice(0, 10);
+  
+  try {
     const response = await this.sheets.spreadsheets.values.get({
       auth,
       spreadsheetId: this.spreadsheetId,
@@ -948,6 +863,7 @@ async addMovie(title, memo) {
     const rowIndex = values.findIndex(row => row[0] == id);
     
     if (rowIndex !== -1) {
+      // ステータス更新
       await this.sheets.spreadsheets.values.update({
         auth,
         spreadsheetId: this.spreadsheetId,
@@ -957,8 +873,22 @@ async addMovie(title, memo) {
           values: [[status, date]]
         }
       });
+      
+      // 活動情報を返す
+      const row = values[rowIndex];
+      return {
+        id: row[0],
+        content: row[2],
+        memo: row[3]
+      };
     }
+  } catch (error) {
+    console.error('活動ステータス更新エラー:', error);
   }
+  
+  return null;
+}
+
 
   async getActivities() {
     if (!this.auth) return ['🎯 [1] テスト活動 (planned)'];
