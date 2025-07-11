@@ -722,6 +722,7 @@ async addMovie(title, memo) {
   console.log('=== skipMovie が受け取った結果 ===', movieInfo);
   return movieInfo;
 }
+	
 async updateMovieStatus(id, status) {
   if (!this.auth) {
     return { id, title: 'テスト映画', memo: 'テストメモ' };
