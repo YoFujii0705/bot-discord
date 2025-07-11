@@ -136,24 +136,17 @@ class CalendarBird {
         console.error('コマンド実行エラー:', error);
         
         // エラー時の応答を改善
-        await this.safeReply(interaction, `❌ エラーが発生しました: ${error.message}`);
+        try {
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: `❌ エラーが発生しました: ${error.message}` });
+          } else if (interaction.deferred) {
+            await interaction.editReply({ content: `❌ エラーが発生しました: ${error.message}` });
+          }
+        } catch (replyError) {
+          console.error('返信エラー:', replyError);
+        }
       }
     });
-  }
-
-  // 安全な応答メソッド
-  async safeReply(interaction, content) {
-    try {
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content });
-      } else if (interaction.deferred && !interaction.replied) {
-        await interaction.editReply({ content });
-      } else {
-        await interaction.followUp({ content });
-      }
-    } catch (error) {
-      console.error('応答送信エラー:', error);
-    }
   }
 
   async handleScheduleCommand(interaction) {
@@ -350,7 +343,15 @@ class CalendarBird {
 
     } catch (error) {
       console.error('Schedule コマンドエラー:', error);
-      await this.safeReply(interaction, `❌ エラーが発生しました: ${error.message}`);
+
+      try {
+        await interaction.editReply({ 
+          content: `❌ エラーが発生しました: ${error.message}` 
+        });
+        console.log('✅ エラー応答送信完了');
+      } catch (replyError) {
+        console.error('返信エラー:', replyError);
+      }
     }
   }
 
@@ -358,38 +359,52 @@ class CalendarBird {
     const subcommand = interaction.options.getSubcommand();
     
     try {
-      // 最初にdeferReplyを一回だけ実行
-      await interaction.deferReply();
-
+      // サブコマンドによって最初の応答を変える
       if (subcommand === 'test') {
-        await interaction.editReply({ content: '🔔 カウントダウン通知をテスト送信中...' });
+        await interaction.reply({ content: '🔔 カウントダウン通知をテスト送信中...' });
         console.log(`🔔 テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
         await this.sendDailyNotification();
         await interaction.editReply({ content: '✅ カウントダウン通知をテスト送信しました！' });
       } 
       else if (subcommand === 'weekly-test') {
-        await interaction.editReply({ content: '📅 週間予定通知をテスト送信中...' });
+        await interaction.reply({ content: '📅 週間予定通知をテスト送信中...' });
         console.log(`📅 週間予定テスト通知実行 (JST: ${this.formatJSTDate(new Date(), true)})`);
         await this.sendWeeklySchedule();
         await interaction.editReply({ content: '✅ 週間予定通知をテスト送信しました！' });
       }
       else if (subcommand === 'toggle') {
-        await interaction.editReply({ content: '🔍 予定を検索中...' });
+        await interaction.reply({ content: '🔍 予定を検索中...' });
         await this.handleToggleCommand(interaction);
       }
       else if (subcommand === 'list') {
-        await interaction.editReply({ content: '📋 予定一覧を取得中...' });
+        await interaction.reply({ content: '📋 予定一覧を取得中...' });
         await this.handleListCommand(interaction);
       }
 
     } catch (error) {
       console.error('Countdown コマンドエラー:', error);
-      await this.safeReply(interaction, `❌ エラーが発生しました: ${error.message}`);
+
+      try {
+        // 🔥 interaction の状態をチェックして適切な応答方法を選択
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: `❌ エラーが発生しました: ${error.message}` });
+        } else if (interaction.deferred && !interaction.replied) {
+          await interaction.editReply({ content: `❌ エラーが発生しました: ${error.message}` });
+        } else {
+          // 既に応答済みの場合はfollowUpを使用
+          await interaction.followUp({ content: `❌ エラーが発生しました: ${error.message}` });
+        }
+        console.log('✅ countdown エラー応答送信完了');
+      } catch (replyError) {
+        console.error('countdown 返信エラー:', replyError);
+        // 🔥 最後の手段としてコンソールログのみ出力（Discord応答は諦める）
+        console.log('⚠️ Discord応答は送信できませんでしたが、処理は完了しています');
+      }
     }
   }
 
   async handleToggleCommand(interaction) {
-    // interaction は既に handleCountdownCommand で deferReply 済み
+    // interaction は既に handleCountdownCommand で reply 済み
     const keyword = interaction.options.getString('keyword');
 
     try {
@@ -436,7 +451,6 @@ class CalendarBird {
         return;
       }
 
-      // 複数の予定がある場合
       const embed = new EmbedBuilder()
         .setTitle('🔄 カウントダウン切り替え対象の選択')
         .setDescription(`"${keyword}" に一致する予定:`)
@@ -484,14 +498,10 @@ class CalendarBird {
         const selectedIndex = parseInt(msg.content) - 1;
         const selectedEvent = matchingEvents[selectedIndex];
 
-        try {
-          await this.toggleEventCountdown(selectedEvent);
-          const newStatus = await this.getEventCountdownStatus(selectedEvent.id);
-          await msg.reply(`✅ "${selectedEvent.summary}" のカウントダウンを ${newStatus ? 'ON' : 'OFF'} に切り替えました。`);
-        } catch (error) {
-          console.error('カウントダウン切り替えエラー:', error);
-          await msg.reply('❌ カウントダウンの切り替えに失敗しました。');
-        }
+        await this.toggleEventCountdown(selectedEvent);
+        const newStatus = await this.getEventCountdownStatus(selectedEvent.id);
+
+        await msg.reply(`✅ "${selectedEvent.summary}" のカウントダウンを ${newStatus ? 'ON' : 'OFF'} に切り替えました。`);
       });
 
       collector.on('end', (collected) => {
@@ -507,7 +517,7 @@ class CalendarBird {
   }
 
   async handleListCommand(interaction) {
-    // interaction は既に handleCountdownCommand で deferReply 済み
+    // interaction は既に handleCountdownCommand で reply 済み
     const days = interaction.options.getInteger('days') || 30;
 
     try {
@@ -531,23 +541,21 @@ class CalendarBird {
         return;
       }
 
-      // ページング処理を簡略化
-      const itemsPerPage = 10; // 制限を厳しくする
-      const maxPages = 5; // 最大ページ数を制限
-      const displayEvents = allEvents.slice(0, itemsPerPage * maxPages);
-      const totalPages = Math.ceil(displayEvents.length / itemsPerPage);
+      // ページング処理
+      const itemsPerPage = 15;
+      const totalPages = Math.ceil(allEvents.length / itemsPerPage);
       let currentPage = 0;
 
-      console.log(`📖 総ページ数: ${totalPages}, 表示予定数: ${displayEvents.length}`);
+      console.log(`📖 総ページ数: ${totalPages}, 総予定数: ${allEvents.length}`);
 
       const generateEmbed = (page) => {
         const start = page * itemsPerPage;
         const end = start + itemsPerPage;
-        const pageEvents = displayEvents.slice(start, end);
+        const pageEvents = allEvents.slice(start, end);
 
         const embed = new EmbedBuilder()
           .setTitle(`📅 今後の予定一覧（${days}日間）`)
-          .setDescription(`🕐 現在の日本時間: ${this.formatJSTDate(new Date(), true)}\n📖 ページ ${page + 1}/${totalPages}`)
+          .setDescription(`🕐 現在の日本時間: ${this.formatJSTDate(new Date(), true)}\n📖 ページ ${page + 1}/${totalPages} (全${allEvents.length}件)`)
           .setColor('#0099FF')
           .setTimestamp();
 
@@ -579,10 +587,10 @@ class CalendarBird {
       };
 
       const generateButtons = (page) => {
-        const components = [];
+        const row = [];
 
         if (page > 0) {
-          components.push({
+          row.push({
             type: 2,
             style: 2,
             label: '⬅️ 前のページ',
@@ -591,7 +599,7 @@ class CalendarBird {
         }
 
         if (page < totalPages - 1) {
-          components.push({
+          row.push({
             type: 2,
             style: 2,
             label: '次のページ ➡️',
@@ -601,7 +609,7 @@ class CalendarBird {
 
         // 複数ページがある場合のみ「閉じる」ボタンを表示
         if (totalPages > 1) {
-          components.push({
+          row.push({
             type: 2,
             style: 4,
             label: '❌ 閉じる',
@@ -609,32 +617,38 @@ class CalendarBird {
           });
         }
 
-        return components.length > 0 ? [{
+        console.log(`🔘 ボタン生成: ページ${page + 1}/${totalPages}, ボタン数: ${row.length}`);
+
+        return row.length > 0 ? [{
           type: 1,
-          components: components
+          components: row
         }] : [];
       };
 
-      try {
-        // 初期表示
-        const initialEmbed = generateEmbed(currentPage);
-        const initialComponents = generateButtons(currentPage);
+      // 初期表示
+      const initialEmbed = generateEmbed(currentPage);
+      const initialComponents = generateButtons(currentPage);
 
+      console.log('📤 Discord応答送信開始...');
+      console.log(`📊 Embed フィールド数: ${initialEmbed.data.fields ? initialEmbed.data.fields.length : 0}`);
+      console.log(`🔘 コンポーネント数: ${initialComponents.length}`);
+
+      try {
         const reply = await interaction.editReply({ 
           embeds: [initialEmbed], 
           components: initialComponents
         });
-
-        console.log('✅ 予定一覧表示完了');
+        console.log('✅ Discord応答送信成功');
 
         // 1ページしかない場合はコレクター設定不要
         if (totalPages <= 1) {
+          console.log('📄 1ページのみなので、ボタンコレクターは設定しません');
           return;
         }
 
-        // ボタン操作のコレクター
+        // ボタン操作のコレクター（複数ページの場合のみ）
         const collector = reply.createMessageComponentCollector({ 
-          time: 180000 // 3分に短縮
+          time: 300000
         });
 
         collector.on('collect', async (buttonInteraction) => {
@@ -692,35 +706,43 @@ class CalendarBird {
         console.error('❌ Discord応答送信エラー:', embedError);
         
         // Embedでの送信に失敗した場合、シンプルなテキストで代替
-        let textContent = `📅 今後の予定一覧（${days}日間）\n`;
-        textContent += `🕐 現在の日本時間: ${this.formatJSTDate(new Date(), true)}\n`;
-        textContent += `📊 全${allEvents.length}件の予定\n\n`;
-        
-        const displayEvents = allEvents.slice(0, 10); // 最初の10件のみ表示
-        
-        displayEvents.forEach((event, index) => {
-          const startTime = new Date(event.start.dateTime || event.start.date);
-          const description = event.description || '';
-          const isCountdownOn = description.toLowerCase().includes('カウントダウン:on');
-          const status = isCountdownOn ? '🟢' : '🔴';
-          const daysLeft = this.calculateDaysLeft(startTime);
+        try {
+          console.log('🔄 テキスト形式で再送信を試行...');
+          
+          let textContent = `📅 今後の予定一覧（${days}日間）\n`;
+          textContent += `🕐 現在の日本時間: ${this.formatJSTDate(new Date(), true)}\n`;
+          textContent += `📊 全${allEvents.length}件の予定\n\n`;
+          
+          const displayEvents = allEvents.slice(0, 10); // 最初の10件のみ表示
+          
+          displayEvents.forEach((event, index) => {
+            const startTime = new Date(event.start.dateTime || event.start.date);
+            const description = event.description || '';
+            const isCountdownOn = description.toLowerCase().includes('カウントダウン:on');
+            const status = isCountdownOn ? '🟢' : '🔴';
+            const daysLeft = this.calculateDaysLeft(startTime);
 
-          let timeDisplay;
-          if (event.start.dateTime) {
-            timeDisplay = this.formatJSTDate(startTime);
-          } else {
-            timeDisplay = this.formatJSTDateOnly(startTime);
+            let timeDisplay;
+            if (event.start.dateTime) {
+              timeDisplay = this.formatJSTDate(startTime);
+            } else {
+              timeDisplay = this.formatJSTDateOnly(startTime);
+            }
+
+            textContent += `${status} ${event.summary}\n${timeDisplay} (あと${daysLeft}日)\n\n`;
+          });
+          
+          if (allEvents.length > 10) {
+            textContent += `... 他${allEvents.length - 10}件の予定があります`;
           }
 
-          textContent += `${status} ${event.summary}\n${timeDisplay} (あと${daysLeft}日)\n\n`;
-        });
-        
-        if (allEvents.length > 10) {
-          textContent += `... 他${allEvents.length - 10}件の予定があります`;
+          await interaction.editReply({ content: textContent });
+          console.log('✅ テキスト形式での応答送信成功');
+          
+        } catch (textError) {
+          console.error('❌ テキスト応答も失敗:', textError);
+          await interaction.editReply({ content: '❌ 予定一覧の表示に失敗しました。' });
         }
-
-        await interaction.editReply({ content: textContent });
-        console.log('✅ テキスト形式での応答送信成功');
       }
 
     } catch (error) {
@@ -792,13 +814,9 @@ class CalendarBird {
       // 今日まだ送信していない場合のみ実行
       if (this.lastWeeklyScheduleDate !== today) {
         console.log(`📅 週間予定通知の時間です (JST: ${this.formatJSTDate(jstTime, true)})`);
-        try {
-          await this.sendWeeklySchedule();
-          this.lastWeeklyScheduleDate = today;
-          console.log(`✅ 週間予定通知送信完了`);
-        } catch (error) {
-          console.error('週間予定通知送信エラー:', error);
-        }
+        await this.sendWeeklySchedule();
+        this.lastWeeklyScheduleDate = today;
+        console.log(`✅ 週間予定通知送信完了`);
       } else {
         console.log(`⏭️ 本日(${today})は既に週間予定通知済みです`);
       }
@@ -815,13 +833,9 @@ class CalendarBird {
       // 今日まだ送信していない場合のみ実行
       if (this.lastCountdownDate !== today) {
         console.log(`🔔 カウントダウン通知の時間です (JST: ${this.formatJSTDate(jstTime, true)})`);
-        try {
-          await this.sendDailyNotification();
-          this.lastCountdownDate = today;
-          console.log(`✅ カウントダウン通知送信完了`);
-        } catch (error) {
-          console.error('カウントダウン通知送信エラー:', error);
-        }
+        await this.sendDailyNotification();
+        this.lastCountdownDate = today;
+        console.log(`✅ カウントダウン通知送信完了`);
       } else {
         console.log(`⏭️ 本日(${today})は既にカウントダウン通知済みです`);
       }
@@ -885,21 +899,24 @@ class CalendarBird {
       // 日付順に表示
       const sortedDates = Object.keys(eventsByDate).sort();
       let totalDisplayed = 0;
-      const maxEventsPerDay = 5; // 1日あたりの最大表示件数を制限
-      const maxTotalEvents = 15; // 全体の最大表示件数を制限
+      // 🔥 制限を完全に撤廃する場合
+      // const maxEventsPerDay = 25;
+      // const maxTotalEvents = 50;
 
       for (const date of sortedDates) {
-        if (totalDisplayed >= maxTotalEvents) break;
+        // 🔥 制限チェックをコメントアウト
+        // if (totalDisplayed >= maxTotalEvents) break;
 
         const dayEvents = eventsByDate[date];
-        const displayEvents = dayEvents.slice(0, maxEventsPerDay);
+        // 🔥 全ての予定を表示
+        const displayEvents = dayEvents; // .slice(0, maxEventsPerDay) を削除
 
-        // 曜日取得を修正
+        // 🔥 曜日取得を修正
         let dayOfWeek;
         try {
           // YYYY/MM/DD形式の日付をYYYY-MM-DD形式に変換
           const normalizedDate = date.replace(/\//g, '-');
-          const dateObj = new Date(normalizedDate + 'T12:00:00+09:00'); // 日本時間を明示
+          const dateObj = new Date(normalizedDate + 'T12:00:00'); // 正午を指定してタイムゾーンの問題を回避
           
           dayOfWeek = dateObj.toLocaleDateString('ja-JP', { 
             weekday: 'short',
@@ -946,9 +963,10 @@ class CalendarBird {
         });
       }
 
-      if (events.length > maxTotalEvents) {
-        embed.setFooter({ text: `※ 表示制限により、${maxTotalEvents}件まで表示。詳細は /countdown list で確認してください。` });
-      }
+      // 🔥 制限表示を削除
+      // if (events.length > maxTotalEvents) {
+      //   embed.setFooter({ text: `※ 表示制限により、${maxTotalEvents}件まで表示。詳細は /countdown list で確認してください。` });
+      // }
 
       const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
       if (channel) {
@@ -992,7 +1010,7 @@ class CalendarBird {
         // 想定締切がある場合のチェック
         const plannedMatch = description.match(/想定締切:(\d{4}-\d{2}-\d{2})/);
         if (plannedMatch) {
-          const plannedDate = new Date(plannedMatch[1] + 'T23:59:59+09:00');
+          const plannedDate = new Date(plannedMatch[1] + 'T23:59:59');
           const plannedDaysLeft = this.calculateDaysLeft(plannedDate);
           
           // 想定締切を過ぎている場合は除外
@@ -1027,7 +1045,7 @@ class CalendarBird {
         let plannedText = '';
 
         if (plannedMatch) {
-          const plannedDate = new Date(plannedMatch[1] + 'T23:59:59+09:00');
+          const plannedDate = new Date(plannedMatch[1] + 'T23:59:59');
           const plannedDaysLeft = this.calculateDaysLeft(plannedDate);
           
           // 想定締切の表示ロジック改善
@@ -1062,29 +1080,6 @@ class CalendarBird {
       console.error('通知送信エラー:', error);
     }
   }
-
-  // calendar-bird.js に追加
-setupCronJob() {
-    // 既存のcronジョブ...
-    
-    // 毎週金曜日に生存確認を送信
-    cron.schedule('0 0 * * 5', async () => {
-        const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
-        if (channel) {
-            await channel.send({
-                content: `🤖 **サーバー生存確認**\n🕐 JST: ${this.formatJSTDate(new Date(), true)}\n📊 稼働時間: ${process.uptime()}秒`,
-                embeds: [{
-                    title: "Oracle Cloud サーバー状態",
-                    description: "サーバーは正常に動作しています",
-                    color: 0x00ff00,
-                    timestamp: new Date()
-                }]
-            });
-        }
-    }, {
-        timezone: 'Asia/Tokyo'
-    });
-}
 
   async registerCommands() {
     const commands = [
