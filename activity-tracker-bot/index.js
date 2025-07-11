@@ -335,78 +335,255 @@ setupEvents() {
     }
   }
 
-  async handleMovieCommand(interaction) {
-    const subcommand = interaction.options.getSubcommand();
+  // handleMovieCommand メソッドの修正版
+async handleMovieCommand(interaction) {
+  const subcommand = interaction.options.getSubcommand();
+  
+  switch (subcommand) {
+    case 'add':
+      const title = interaction.options.getString('title');
+      const memo = interaction.options.getString('memo') || '';
+      
+      const movieId = await this.addMovie(title, memo);
+      await interaction.reply(`🎬 映画を追加しました！\nID: ${movieId}\nタイトル: ${title}`);
+      break;
     
-    switch (subcommand) {
-      case 'add':
-        const title = interaction.options.getString('title');
-        const memo = interaction.options.getString('memo') || '';
-        
-        const movieId = await this.addMovie(title, memo);
-        await interaction.reply(`🎬 映画を追加しました！\nID: ${movieId}\nタイトル: ${title}`);
-        break;
-      
-      case 'watch':
-        const watchId = interaction.options.getInteger('id');
-        await this.watchMovie(watchId);
-        await interaction.reply(`🎬 視聴済みにしました！面白かったですか？\nID: ${movieId}\nタイトル: ${title}`);
-        break;
-      
-      case 'skip':
-        const skipId = interaction.options.getInteger('id');
-        await this.skipMovie(skipId);
-        await interaction.reply(`😅 見逃してしまいましたね。また機会があったら見てみてください！\nID: ${movieId}\nタイトル: ${title}`);
-        break;
-      
-      case 'list':
-        const movies = await this.getMovies();
+    case 'watch':
+      const watchId = interaction.options.getInteger('id');
+      const watchedMovie = await this.watchMovie(watchId);
+      if (watchedMovie) {
         const embed = new EmbedBuilder()
-          .setTitle('🎬 映画一覧')
-          .setColor('#ff6b6b')
-          .setDescription(movies.length > 0 ? movies.join('\n') : '登録されている映画はありません');
+          .setTitle('🎉 視聴完了！')
+          .setColor('#00ff00')
+          .addFields(
+            { name: 'タイトル', value: watchedMovie.title, inline: true },
+            { name: 'ID', value: watchedMovie.id.toString(), inline: true },
+            { name: '備考', value: watchedMovie.memo || 'なし', inline: false }
+          )
+          .setDescription('🎬 視聴済みにしました！面白かったですか？✨')
+          .setTimestamp();
         
         await interaction.reply({ embeds: [embed] });
-        break;
-    }
-  }
-
-  async handleActivityCommand(interaction) {
-    const subcommand = interaction.options.getSubcommand();
+      } else {
+        await interaction.reply('指定されたIDの映画が見つかりませんでした。');
+      }
+      break;
     
-    switch (subcommand) {
-      case 'add':
-        const content = interaction.options.getString('content');
-        const memo = interaction.options.getString('memo') || '';
-        
-        const activityId = await this.addActivity(content, memo);
-        await interaction.reply(`🎯 活動を追加しました！\nID: ${activityId}\n内容: ${content}`);
-        break;
-      
-      case 'done':
-        const doneId = interaction.options.getInteger('id');
-        await this.doneActivity(doneId);
-        await interaction.reply(`✅ 活動を完了しました！お疲れ様でした！🎉\nID: ${activityId}\n内容: ${content}`);
-        break;
-      
-      case 'skip':
-        const skipId = interaction.options.getInteger('id');
-        await this.skipActivity(skipId);
-        await interaction.reply(`😅 今回は見送りましたね。また機会があればチャレンジしてみてください！\nID: ${activityId}\n内容: ${content}`);
-        break;
-      
-      case 'list':
-        const activities = await this.getActivities();
+    case 'skip':
+      const skipId = interaction.options.getInteger('id');
+      const skippedMovie = await this.skipMovie(skipId);
+      if (skippedMovie) {
         const embed = new EmbedBuilder()
-          .setTitle('🎯 活動一覧')
-          .setColor('#4ecdc4')
-          .setDescription(activities.length > 0 ? activities.join('\n') : '登録されている活動はありません');
+          .setTitle('😅 見逃してしまいました')
+          .setColor('#ffa500')
+          .addFields(
+            { name: 'タイトル', value: skippedMovie.title, inline: true },
+            { name: 'ID', value: skippedMovie.id.toString(), inline: true },
+            { name: '備考', value: skippedMovie.memo || 'なし', inline: false }
+          )
+          .setDescription('😅 見逃してしまいましたね。また機会があったら見てみてください！')
+          .setTimestamp();
         
         await interaction.reply({ embeds: [embed] });
-        break;
-    }
+      } else {
+        await interaction.reply('指定されたIDの映画が見つかりませんでした。');
+      }
+      break;
+    
+    case 'list':
+      const movies = await this.getMovies();
+      const embed = new EmbedBuilder()
+        .setTitle('🎬 映画一覧')
+        .setColor('#ff6b6b')
+        .setDescription(movies.length > 0 ? movies.join('\n') : '登録されている映画はありません');
+      
+      await interaction.reply({ embeds: [embed] });
+      break;
   }
+}
 
+// handleActivityCommand メソッドの修正版
+async handleActivityCommand(interaction) {
+  const subcommand = interaction.options.getSubcommand();
+  
+  switch (subcommand) {
+    case 'add':
+      const content = interaction.options.getString('content');
+      const memo = interaction.options.getString('memo') || '';
+      
+      const activityId = await this.addActivity(content, memo);
+      await interaction.reply(`🎯 活動を追加しました！\nID: ${activityId}\n内容: ${content}`);
+      break;
+    
+    case 'done':
+      const doneId = interaction.options.getInteger('id');
+      const completedActivity = await this.doneActivity(doneId);
+      if (completedActivity) {
+        const embed = new EmbedBuilder()
+          .setTitle('🎉 活動完了！')
+          .setColor('#00ff00')
+          .addFields(
+            { name: '活動内容', value: completedActivity.content, inline: false },
+            { name: 'ID', value: completedActivity.id.toString(), inline: true },
+            { name: '備考', value: completedActivity.memo || 'なし', inline: false }
+          )
+          .setDescription('✅ 活動を完了しました！お疲れ様でした！🎉')
+          .setTimestamp();
+        
+        await interaction.reply({ embeds: [embed] });
+      } else {
+        await interaction.reply('指定されたIDの活動が見つかりませんでした。');
+      }
+      break;
+    
+    case 'skip':
+      const skipId = interaction.options.getInteger('id');
+      const skippedActivity = await this.skipActivity(skipId);
+      if (skippedActivity) {
+        const embed = new EmbedBuilder()
+          .setTitle('😅 やり逃してしまいました')
+          .setColor('#ffa500')
+          .addFields(
+            { name: '活動内容', value: skippedActivity.content, inline: false },
+            { name: 'ID', value: skippedActivity.id.toString(), inline: true },
+            { name: '備考', value: skippedActivity.memo || 'なし', inline: false }
+          )
+          .setDescription('😅 今回は見送りましたね。また機会があればチャレンジしてみてください！')
+          .setTimestamp();
+        
+        await interaction.reply({ embeds: [embed] });
+      } else {
+        await interaction.reply('指定されたIDの活動が見つかりませんでした。');
+      }
+      break;
+    
+    case 'list':
+      const activities = await this.getActivities();
+      const embed = new EmbedBuilder()
+        .setTitle('🎯 活動一覧')
+        .setColor('#4ecdc4')
+        .setDescription(activities.length > 0 ? activities.join('\n') : '登録されている活動はありません');
+      
+      await interaction.reply({ embeds: [embed] });
+      break;
+  }
+}
+
+// watchMovie メソッドの修正版（映画情報を返すように）
+async watchMovie(id) {
+  const movieInfo = await this.updateMovieStatus(id, 'watched');
+  return movieInfo;
+}
+
+// skipMovie メソッドの修正版（映画情報を返すように）
+async skipMovie(id) {
+  const movieInfo = await this.updateMovieStatus(id, 'missed');
+  return movieInfo;
+}
+
+// doneActivity メソッドの修正版（活動情報を返すように）
+async doneActivity(id) {
+  const activityInfo = await this.updateActivityStatus(id, 'done');
+  return activityInfo;
+}
+
+// skipActivity メソッドの修正版（活動情報を返すように）
+async skipActivity(id) {
+  const activityInfo = await this.updateActivityStatus(id, 'skipped');
+  return activityInfo;
+}
+
+// updateMovieStatus メソッドの修正版（映画情報を返すように）
+async updateMovieStatus(id, status) {
+  if (!this.auth) {
+    return { id, title: 'テスト映画', memo: 'テストメモ' };
+  }
+  
+  const auth = await this.auth.getClient();
+  const date = new Date().toISOString().slice(0, 10);
+  
+  try {
+    const response = await this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'movies_master!A:F'
+    });
+    
+    const values = response.data.values || [];
+    const rowIndex = values.findIndex(row => row[0] == id);
+    
+    if (rowIndex !== -1) {
+      // ステータス更新
+      await this.sheets.spreadsheets.values.update({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range: `movies_master!E${rowIndex + 1}:F${rowIndex + 1}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[status, date]]
+        }
+      });
+      
+      // 映画情報を返す
+      const row = values[rowIndex];
+      return {
+        id: row[0],
+        title: row[2],
+        memo: row[3]
+      };
+    }
+  } catch (error) {
+    console.error('映画ステータス更新エラー:', error);
+  }
+  
+  return null;
+}
+
+// updateActivityStatus メソッドの修正版（活動情報を返すように）
+async updateActivityStatus(id, status) {
+  if (!this.auth) {
+    return { id, content: 'テスト活動', memo: 'テストメモ' };
+  }
+  
+  const auth = await this.auth.getClient();
+  const date = new Date().toISOString().slice(0, 10);
+  
+  try {
+    const response = await this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'activities_master!A:F'
+    });
+    
+    const values = response.data.values || [];
+    const rowIndex = values.findIndex(row => row[0] == id);
+    
+    if (rowIndex !== -1) {
+      // ステータス更新
+      await this.sheets.spreadsheets.values.update({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range: `activities_master!E${rowIndex + 1}:F${rowIndex + 1}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[status, date]]
+        }
+      });
+      
+      // 活動情報を返す
+      const row = values[rowIndex];
+      return {
+        id: row[0],
+        content: row[2],
+        memo: row[3]
+      };
+    }
+  } catch (error) {
+    console.error('活動ステータス更新エラー:', error);
+  }
+  
+  return null;
+}
   async handleReportCommand(interaction) {
     const category = interaction.options.getString('category');
     const id = interaction.options.getInteger('id');
@@ -913,27 +1090,6 @@ async addDailyReport(category, id, content) {
     }, {
       timezone: "Asia/Tokyo"
     });
-
-　　// テスト用: 1分後に各通知をテスト実行
-setTimeout(async () => {
-  console.log('=== 朝の通知テスト ===');
-  await this.sendMorningReminder();
-}, 60000); // 1分後
-
-setTimeout(async () => {
-  console.log('=== 週次レポートテスト ===');
-  await this.sendWeeklyReport();
-}, 120000); // 2分後
-
-setTimeout(async () => {
-  console.log('=== 月次レポートテスト ===');
-  await this.sendMonthlyReport();
-}, 180000); // 3分後
-
-setTimeout(async () => {
-  console.log('=== 放置アラートテスト ===');
-  await this.checkAbandonedItems();
-}, 240000); // 4分後
     
     console.log('定期通知機能が有効になりました');
   }
