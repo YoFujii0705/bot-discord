@@ -377,18 +377,8 @@ class ActivityTrackerBot {
       const watchId = interaction.options.getInteger('id');
       const watchedMovie = await this.watchMovie(watchId);
       if (watchedMovie) {
-        const embed = new EmbedBuilder()
-          .setTitle('🎉 視聴完了！')
-          .setDescription('🎬 視聴済みにしました！面白かったですか？✨')
-          .setColor(0x00ff00)
-          .addFields([
-            { name: 'タイトル', value: watchedMovie.title || '不明', inline: true },
-            { name: 'ID', value: watchedMovie.id.toString(), inline: true },
-            { name: '備考', value: watchedMovie.memo || 'なし', inline: false }
-          ])
-          .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
+        const memoText = watchedMovie.memo ? `\n備考: ${watchedMovie.memo}` : '';
+        await interaction.reply(`🎉 視聴完了！\nタイトル: ${watchedMovie.title}\nID: ${watchedMovie.id}${memoText}\n\n🎬 視聴済みにしました！面白かったですか？✨`);
       } else {
         await interaction.reply('指定されたIDの映画が見つかりませんでした。');
       }
@@ -398,18 +388,8 @@ class ActivityTrackerBot {
       const skipId = interaction.options.getInteger('id');
       const skippedMovie = await this.skipMovie(skipId);
       if (skippedMovie) {
-        const embed = new EmbedBuilder()
-          .setTitle('😅 見逃してしまいました')
-          .setDescription('😅 見逃してしまいましたね。また機会があったら見てみてください！')
-          .setColor(0xffa500)
-          .addFields([
-            { name: 'タイトル', value: skippedMovie.title || '不明', inline: true },
-            { name: 'ID', value: skippedMovie.id.toString(), inline: true },
-            { name: '備考', value: skippedMovie.memo || 'なし', inline: false }
-          ])
-          .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
+        const memoText = skippedMovie.memo ? `\n備考: ${skippedMovie.memo}` : '';
+        await interaction.reply(`😅 見逃してしまいました\nタイトル: ${skippedMovie.title}\nID: ${skippedMovie.id}${memoText}\n\n😅 見逃してしまいましたね。また機会があったら見てみてください！`);
       } else {
         await interaction.reply('指定されたIDの映画が見つかりませんでした。');
       }
@@ -443,18 +423,8 @@ async handleActivityCommand(interaction) {
       const doneId = interaction.options.getInteger('id');
       const completedActivity = await this.doneActivity(doneId);
       if (completedActivity) {
-        const embed = new EmbedBuilder()
-          .setTitle('🎉 活動完了！')
-          .setDescription('✅ 活動を完了しました！お疲れ様でした！🎉')
-          .setColor(0x00ff00)
-          .addFields([
-            { name: '活動内容', value: completedActivity.content || '不明', inline: false },
-            { name: 'ID', value: completedActivity.id.toString(), inline: true },
-            { name: '備考', value: completedActivity.memo || 'なし', inline: false }
-          ])
-          .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
+        const memoText = completedActivity.memo ? `\n備考: ${completedActivity.memo}` : '';
+        await interaction.reply(`🎉 活動完了！\n活動内容: ${completedActivity.content}\nID: ${completedActivity.id}${memoText}\n\n✅ 活動を完了しました！お疲れ様でした！🎉`);
       } else {
         await interaction.reply('指定されたIDの活動が見つかりませんでした。');
       }
@@ -464,18 +434,8 @@ async handleActivityCommand(interaction) {
       const skipId = interaction.options.getInteger('id');
       const skippedActivity = await this.skipActivity(skipId);
       if (skippedActivity) {
-        const embed = new EmbedBuilder()
-          .setTitle('😅 やり逃してしまいました')
-          .setDescription('😅 今回は見送りましたね。また機会があればチャレンジしてみてください！')
-          .setColor(0xffa500)
-          .addFields([
-            { name: '活動内容', value: skippedActivity.content || '不明', inline: false },
-            { name: 'ID', value: skippedActivity.id.toString(), inline: true },
-            { name: '備考', value: skippedActivity.memo || 'なし', inline: false }
-          ])
-          .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
+        const memoText = skippedActivity.memo ? `\n備考: ${skippedActivity.memo}` : '';
+        await interaction.reply(`😅 やり逃してしまいました\n活動内容: ${skippedActivity.content}\nID: ${skippedActivity.id}${memoText}\n\n😅 今回は見送りましたね。また機会があればチャレンジしてみてください！`);
       } else {
         await interaction.reply('指定されたIDの活動が見つかりませんでした。');
       }
