@@ -379,13 +379,13 @@ class ActivityTrackerBot {
       if (watchedMovie) {
         const embed = new EmbedBuilder()
           .setTitle('🎉 視聴完了！')
-          .setColor('#00ff00')
-          .addFields(
-            { name: 'タイトル', value: watchedMovie.title, inline: true },
+          .setDescription('🎬 視聴済みにしました！面白かったですか？✨')
+          .setColor(0x00ff00)
+          .addFields([
+            { name: 'タイトル', value: watchedMovie.title || '不明', inline: true },
             { name: 'ID', value: watchedMovie.id.toString(), inline: true },
             { name: '備考', value: watchedMovie.memo || 'なし', inline: false }
-          )
-          .setDescription('🎬 視聴済みにしました！面白かったですか？✨')
+          ])
           .setTimestamp();
         
         await interaction.reply({ embeds: [embed] });
@@ -400,13 +400,13 @@ class ActivityTrackerBot {
       if (skippedMovie) {
         const embed = new EmbedBuilder()
           .setTitle('😅 見逃してしまいました')
-          .setColor('#ffa500')
-          .addFields(
-            { name: 'タイトル', value: skippedMovie.title, inline: true },
+          .setDescription('😅 見逃してしまいましたね。また機会があったら見てみてください！')
+          .setColor(0xffa500)
+          .addFields([
+            { name: 'タイトル', value: skippedMovie.title || '不明', inline: true },
             { name: 'ID', value: skippedMovie.id.toString(), inline: true },
             { name: '備考', value: skippedMovie.memo || 'なし', inline: false }
-          )
-          .setDescription('😅 見逃してしまいましたね。また機会があったら見てみてください！')
+          ])
           .setTimestamp();
         
         await interaction.reply({ embeds: [embed] });
@@ -419,7 +419,7 @@ class ActivityTrackerBot {
       const movies = await this.getMovies();
       const embed = new EmbedBuilder()
         .setTitle('🎬 映画一覧')
-        .setColor('#ff6b6b')
+        .setColor(0xff6b6b)
         .setDescription(movies.length > 0 ? movies.join('\n') : '登録されている映画はありません');
       
       await interaction.reply({ embeds: [embed] });
@@ -445,13 +445,13 @@ async handleActivityCommand(interaction) {
       if (completedActivity) {
         const embed = new EmbedBuilder()
           .setTitle('🎉 活動完了！')
-          .setColor('#00ff00')
-          .addFields(
-            { name: '活動内容', value: completedActivity.content, inline: false },
+          .setDescription('✅ 活動を完了しました！お疲れ様でした！🎉')
+          .setColor(0x00ff00)
+          .addFields([
+            { name: '活動内容', value: completedActivity.content || '不明', inline: false },
             { name: 'ID', value: completedActivity.id.toString(), inline: true },
             { name: '備考', value: completedActivity.memo || 'なし', inline: false }
-          )
-          .setDescription('✅ 活動を完了しました！お疲れ様でした！🎉')
+          ])
           .setTimestamp();
         
         await interaction.reply({ embeds: [embed] });
@@ -466,13 +466,13 @@ async handleActivityCommand(interaction) {
       if (skippedActivity) {
         const embed = new EmbedBuilder()
           .setTitle('😅 やり逃してしまいました')
-          .setColor('#ffa500')
-          .addFields(
-            { name: '活動内容', value: skippedActivity.content, inline: false },
+          .setDescription('😅 今回は見送りましたね。また機会があればチャレンジしてみてください！')
+          .setColor(0xffa500)
+          .addFields([
+            { name: '活動内容', value: skippedActivity.content || '不明', inline: false },
             { name: 'ID', value: skippedActivity.id.toString(), inline: true },
             { name: '備考', value: skippedActivity.memo || 'なし', inline: false }
-          )
-          .setDescription('😅 今回は見送りましたね。また機会があればチャレンジしてみてください！')
+          ])
           .setTimestamp();
         
         await interaction.reply({ embeds: [embed] });
@@ -485,14 +485,13 @@ async handleActivityCommand(interaction) {
       const activities = await this.getActivities();
       const embed = new EmbedBuilder()
         .setTitle('🎯 活動一覧')
-        .setColor('#4ecdc4')
+        .setColor(0x4ecdc4)
         .setDescription(activities.length > 0 ? activities.join('\n') : '登録されている活動はありません');
       
       await interaction.reply({ embeds: [embed] });
       break;
   }
 }
-
   async handleReportCommand(interaction) {
     const category = interaction.options.getString('category');
     const id = interaction.options.getInteger('id');
