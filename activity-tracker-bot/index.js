@@ -359,20 +359,56 @@ setupEvents() {
     }
   }
 
-  case 'skip':
-  const skipId = interaction.options.getInteger('id');
-  console.log('=== skip コマンド開始 ===', skipId);
-  const skippedMovie = await this.skipMovie(skipId);
-  console.log('=== skipMovie から戻った結果 ===', skippedMovie);
-  if (skippedMovie) {
-    console.log('=== 映画情報がある場合の処理 ===');
-    const memoText = skippedMovie.memo ? `\n備考: ${skippedMovie.memo}` : '';
-    await interaction.reply(`😅 見逃してしまいました\nタイトル: ${skippedMovie.title}\nID: ${skippedMovie.id}${memoText}\n\n😅 見逃してしまいましたね。また機会があったら見てみてください！`);
-  } else {
-    console.log('=== 映画情報がない場合の処理 ===');
-    await interaction.reply('指定されたIDの映画が見つかりませんでした。');
+async handleMovieCommand(interaction) {
+  const subcommand = interaction.options.getSubcommand();
+  
+  switch (subcommand) {
+    case 'add':
+      const title = interaction.options.getString('title');
+      const memo = interaction.options.getString('memo') || '';
+      
+      const movieId = await this.addMovie(title, memo);
+      await interaction.reply(`🎬 映画を追加しました！\nID: ${movieId}\nタイトル: ${title}`);
+      break;
+    
+    case 'watch':
+      const watchId = interaction.options.getInteger('id');
+      const watchedMovie = await this.watchMovie(watchId);
+      if (watchedMovie) {
+        const memoText = watchedMovie.memo ? `\n備考: ${watchedMovie.memo}` : '';
+        await interaction.reply(`🎉 視聴完了！\nタイトル: ${watchedMovie.title}\nID: ${watchedMovie.id}${memoText}\n\n🎬 視聴済みにしました！面白かったですか？✨`);
+      } else {
+        await interaction.reply('指定されたIDの映画が見つかりませんでした。');
+      }
+      break;
+    
+    case 'skip':
+      const skipId = interaction.options.getInteger('id');
+      console.log('=== skip コマンド開始 ===', skipId);
+      const skippedMovie = await this.skipMovie(skipId);
+      console.log('=== skipMovie から戻った結果 ===', skippedMovie);
+      if (skippedMovie) {
+        console.log('=== 映画情報がある場合の処理 ===');
+        const memoText = skippedMovie.memo ? `\n備考: ${skippedMovie.memo}` : '';
+        await interaction.reply(`😅 見逃してしまいました\nタイトル: ${skippedMovie.title}\nID: ${skippedMovie.id}${memoText}\n\n😅 見逃してしまいましたね。また機会があったら見てみてください！`);
+      } else {
+        console.log('=== 映画情報がない場合の処理 ===');
+        await interaction.reply('指定されたIDの映画が見つかりませんでした。');
+      }
+      break;
+    
+    case 'list':
+      const movies = await this.getMovies();
+      const embed = new EmbedBuilder()
+        .setTitle('🎬 映画一覧')
+        .setColor('#ff6b6b')
+        .setDescription(movies.length > 0 ? movies.join('\n') : '登録されている映画はありません');
+      
+      await interaction.reply({ embeds: [embed] });
+      break;
   }
-  break;
+}
+	
   async handleActivityCommand(interaction) {
     const subcommand = interaction.options.getSubcommand();
     
@@ -686,7 +722,7 @@ async addMovie(title, memo) {
   console.log('=== skipMovie が受け取った結果 ===', movieInfo);
   return movieInfo;
 }
-  async updateMovieStatus(id, status) {
+async updateMovieStatus(id, status) {
   if (!this.auth) {
     return { id, title: 'テスト映画', memo: 'テストメモ' };
   }
@@ -707,7 +743,7 @@ async addMovie(title, memo) {
     if (rowIndex !== -1) {
       const row = values[rowIndex];
       
-      // 先に映画情報を保存
+      // 映画情報を保存
       const movieInfo = {
         id: row[0],
         title: row[2] || '不明なタイトル',
@@ -732,7 +768,8 @@ async addMovie(title, memo) {
   }
   
   return null;
-}	
+}
+	
   async getMovies() {
     if (!this.auth) return ['🎬 [1] テスト映画 (want_to_watch)'];
     
