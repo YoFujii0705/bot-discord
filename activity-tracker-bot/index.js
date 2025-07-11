@@ -47,7 +47,7 @@ class ActivityTrackerBot {
     this.setupScheduledTasks();
   }
 
-setupCommands() {
+  setupCommands() {
     console.log('setupCommands開始');
     
     const commands = [];
@@ -176,7 +176,7 @@ setupCommands() {
 
     commands.push(statsCommand);
 
-// 検索コマンド
+    // 検索コマンド
     const searchCommand = new SlashCommandBuilder()
       .setName('search')
       .setDescription('アイテムを検索')
@@ -233,7 +233,8 @@ setupCommands() {
       }
     });
   }
-setupEvents() {
+
+  setupEvents() {
     this.client.on('interactionCreate', async interaction => {
       if (!interaction.isChatInputCommand()) return;
 
@@ -256,13 +257,15 @@ setupEvents() {
           case 'stats':
             await this.handleStatsCommand(interaction);
             break;
-	  case 'search':
+          case 'search':
             await this.handleSearchCommand(interaction);
             break;
         }
       } catch (error) {
         console.error('エラー:', error);
-        await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
+        }
       }
     });
   }
@@ -335,139 +338,137 @@ setupEvents() {
     }
   }
 
-  // handleMovieCommand メソッドの修正版
-async handleMovieCommand(interaction) {
-  const subcommand = interaction.options.getSubcommand();
-  
-  switch (subcommand) {
-    case 'add':
-      const title = interaction.options.getString('title');
-      const memo = interaction.options.getString('memo') || '';
-      
-      const movieId = await this.addMovie(title, memo);
-      await interaction.reply(`🎬 映画を追加しました！\nID: ${movieId}\nタイトル: ${title}`);
-      break;
+  async handleMovieCommand(interaction) {
+    const subcommand = interaction.options.getSubcommand();
     
-    case 'watch':
-      const watchId = interaction.options.getInteger('id');
-      const watchedMovie = await this.watchMovie(watchId);
-      if (watchedMovie) {
+    switch (subcommand) {
+      case 'add':
+        const title = interaction.options.getString('title');
+        const memo = interaction.options.getString('memo') || '';
+        
+        const movieId = await this.addMovie(title, memo);
+        await interaction.reply(`🎬 映画を追加しました！\nID: ${movieId}\nタイトル: ${title}`);
+        break;
+      
+      case 'watch':
+        const watchId = interaction.options.getInteger('id');
+        const watchedMovie = await this.watchMovie(watchId);
+        if (watchedMovie) {
+          const embed = new EmbedBuilder()
+            .setTitle('🎉 視聴完了！')
+            .setColor('#00ff00')
+            .addFields(
+              { name: 'タイトル', value: watchedMovie.title, inline: true },
+              { name: 'ID', value: watchedMovie.id.toString(), inline: true },
+              { name: '備考', value: watchedMovie.memo || 'なし', inline: false }
+            )
+            .setDescription('🎬 視聴済みにしました！面白かったですか？✨')
+            .setTimestamp();
+          
+          await interaction.reply({ embeds: [embed] });
+        } else {
+          await interaction.reply('指定されたIDの映画が見つかりませんでした。');
+        }
+        break;
+      
+      case 'skip':
+        const skipId = interaction.options.getInteger('id');
+        const skippedMovie = await this.skipMovie(skipId);
+        if (skippedMovie) {
+          const embed = new EmbedBuilder()
+            .setTitle('😅 見逃してしまいました')
+            .setColor('#ffa500')
+            .addFields(
+              { name: 'タイトル', value: skippedMovie.title, inline: true },
+              { name: 'ID', value: skippedMovie.id.toString(), inline: true },
+              { name: '備考', value: skippedMovie.memo || 'なし', inline: false }
+            )
+            .setDescription('😅 見逃してしまいましたね。また機会があったら見てみてください！')
+            .setTimestamp();
+          
+          await interaction.reply({ embeds: [embed] });
+        } else {
+          await interaction.reply('指定されたIDの映画が見つかりませんでした。');
+        }
+        break;
+      
+      case 'list':
+        const movies = await this.getMovies();
         const embed = new EmbedBuilder()
-          .setTitle('🎉 視聴完了！')
-          .setColor('#00ff00')
-          .addFields(
-            { name: 'タイトル', value: watchedMovie.title, inline: true },
-            { name: 'ID', value: watchedMovie.id.toString(), inline: true },
-            { name: '備考', value: watchedMovie.memo || 'なし', inline: false }
-          )
-          .setDescription('🎬 視聴済みにしました！面白かったですか？✨')
-          .setTimestamp();
+          .setTitle('🎬 映画一覧')
+          .setColor('#ff6b6b')
+          .setDescription(movies.length > 0 ? movies.join('\n') : '登録されている映画はありません');
         
         await interaction.reply({ embeds: [embed] });
-      } else {
-        await interaction.reply('指定されたIDの映画が見つかりませんでした。');
-      }
-      break;
-    
-    case 'skip':
-      const skipId = interaction.options.getInteger('id');
-      const skippedMovie = await this.skipMovie(skipId);
-      if (skippedMovie) {
-        const embed = new EmbedBuilder()
-          .setTitle('😅 見逃してしまいました')
-          .setColor('#ffa500')
-          .addFields(
-            { name: 'タイトル', value: skippedMovie.title, inline: true },
-            { name: 'ID', value: skippedMovie.id.toString(), inline: true },
-            { name: '備考', value: skippedMovie.memo || 'なし', inline: false }
-          )
-          .setDescription('😅 見逃してしまいましたね。また機会があったら見てみてください！')
-          .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
-      } else {
-        await interaction.reply('指定されたIDの映画が見つかりませんでした。');
-      }
-      break;
-    
-    case 'list':
-      const movies = await this.getMovies();
-      const embed = new EmbedBuilder()
-        .setTitle('🎬 映画一覧')
-        .setColor('#ff6b6b')
-        .setDescription(movies.length > 0 ? movies.join('\n') : '登録されている映画はありません');
-      
-      await interaction.reply({ embeds: [embed] });
-      break;
+        break;
+    }
   }
-}
 
-// handleActivityCommand メソッドの修正版
-async handleActivityCommand(interaction) {
-  const subcommand = interaction.options.getSubcommand();
-  
-  switch (subcommand) {
-    case 'add':
-      const content = interaction.options.getString('content');
-      const memo = interaction.options.getString('memo') || '';
-      
-      const activityId = await this.addActivity(content, memo);
-      await interaction.reply(`🎯 活動を追加しました！\nID: ${activityId}\n内容: ${content}`);
-      break;
+  async handleActivityCommand(interaction) {
+    const subcommand = interaction.options.getSubcommand();
     
-    case 'done':
-      const doneId = interaction.options.getInteger('id');
-      const completedActivity = await this.doneActivity(doneId);
-      if (completedActivity) {
+    switch (subcommand) {
+      case 'add':
+        const content = interaction.options.getString('content');
+        const memo = interaction.options.getString('memo') || '';
+        
+        const activityId = await this.addActivity(content, memo);
+        await interaction.reply(`🎯 活動を追加しました！\nID: ${activityId}\n内容: ${content}`);
+        break;
+      
+      case 'done':
+        const doneId = interaction.options.getInteger('id');
+        const completedActivity = await this.doneActivity(doneId);
+        if (completedActivity) {
+          const embed = new EmbedBuilder()
+            .setTitle('🎉 活動完了！')
+            .setColor('#00ff00')
+            .addFields(
+              { name: '活動内容', value: completedActivity.content, inline: false },
+              { name: 'ID', value: completedActivity.id.toString(), inline: true },
+              { name: '備考', value: completedActivity.memo || 'なし', inline: false }
+            )
+            .setDescription('✅ 活動を完了しました！お疲れ様でした！🎉')
+            .setTimestamp();
+          
+          await interaction.reply({ embeds: [embed] });
+        } else {
+          await interaction.reply('指定されたIDの活動が見つかりませんでした。');
+        }
+        break;
+      
+      case 'skip':
+        const skipId = interaction.options.getInteger('id');
+        const skippedActivity = await this.skipActivity(skipId);
+        if (skippedActivity) {
+          const embed = new EmbedBuilder()
+            .setTitle('😅 やり逃してしまいました')
+            .setColor('#ffa500')
+            .addFields(
+              { name: '活動内容', value: skippedActivity.content, inline: false },
+              { name: 'ID', value: skippedActivity.id.toString(), inline: true },
+              { name: '備考', value: skippedActivity.memo || 'なし', inline: false }
+            )
+            .setDescription('😅 今回は見送りましたね。また機会があればチャレンジしてみてください！')
+            .setTimestamp();
+          
+          await interaction.reply({ embeds: [embed] });
+        } else {
+          await interaction.reply('指定されたIDの活動が見つかりませんでした。');
+        }
+        break;
+      
+      case 'list':
+        const activities = await this.getActivities();
         const embed = new EmbedBuilder()
-          .setTitle('🎉 活動完了！')
-          .setColor('#00ff00')
-          .addFields(
-            { name: '活動内容', value: completedActivity.content, inline: false },
-            { name: 'ID', value: completedActivity.id.toString(), inline: true },
-            { name: '備考', value: completedActivity.memo || 'なし', inline: false }
-          )
-          .setDescription('✅ 活動を完了しました！お疲れ様でした！🎉')
-          .setTimestamp();
+          .setTitle('🎯 活動一覧')
+          .setColor('#4ecdc4')
+          .setDescription(activities.length > 0 ? activities.join('\n') : '登録されている活動はありません');
         
         await interaction.reply({ embeds: [embed] });
-      } else {
-        await interaction.reply('指定されたIDの活動が見つかりませんでした。');
-      }
-      break;
-    
-    case 'skip':
-      const skipId = interaction.options.getInteger('id');
-      const skippedActivity = await this.skipActivity(skipId);
-      if (skippedActivity) {
-        const embed = new EmbedBuilder()
-          .setTitle('😅 やり逃してしまいました')
-          .setColor('#ffa500')
-          .addFields(
-            { name: '活動内容', value: skippedActivity.content, inline: false },
-            { name: 'ID', value: skippedActivity.id.toString(), inline: true },
-            { name: '備考', value: skippedActivity.memo || 'なし', inline: false }
-          )
-          .setDescription('😅 今回は見送りましたね。また機会があればチャレンジしてみてください！')
-          .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
-      } else {
-        await interaction.reply('指定されたIDの活動が見つかりませんでした。');
-      }
-      break;
-    
-    case 'list':
-      const activities = await this.getActivities();
-      const embed = new EmbedBuilder()
-        .setTitle('🎯 活動一覧')
-        .setColor('#4ecdc4')
-        .setDescription(activities.length > 0 ? activities.join('\n') : '登録されている活動はありません');
-      
-      await interaction.reply({ embeds: [embed] });
-      break;
+        break;
+    }
   }
-}
 
   async handleReportCommand(interaction) {
     const category = interaction.options.getString('category');
@@ -503,39 +504,39 @@ async handleActivityCommand(interaction) {
     }
   }
 
-async handleStatsCommand(interaction) {
-  const subcommand = interaction.options.getSubcommand();
-  
-  try {
-    let embed;
+  async handleStatsCommand(interaction) {
+    const subcommand = interaction.options.getSubcommand();
     
-    switch (subcommand) {
-      case 'summary':
-        embed = await this.createSummaryStats();
-        break;
-      case 'weekly':
-        embed = await this.createWeeklyStats();
-        break;
-      case 'monthly':
-        embed = await this.createMonthlyStats();
-        break;
-      case 'books':
-        embed = await this.createBookStats();
-        break;
-      case 'current':
-        embed = await this.createCurrentStats();
-        break;
-      default:
-        embed = await this.createSummaryStats();
-        break;
+    try {
+      let embed;
+      
+      switch (subcommand) {
+        case 'summary':
+          embed = await this.createSummaryStats();
+          break;
+        case 'weekly':
+          embed = await this.createWeeklyStats();
+          break;
+        case 'monthly':
+          embed = await this.createMonthlyStats();
+          break;
+        case 'books':
+          embed = await this.createBookStats();
+          break;
+        case 'current':
+          embed = await this.createCurrentStats();
+          break;
+        default:
+          embed = await this.createSummaryStats();
+          break;
+      }
+      
+      await interaction.reply({ embeds: [embed] });
+    } catch (error) {
+      console.error('統計エラー:', error);
+      await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
     }
-    
-    await interaction.reply({ embeds: [embed] });
-  } catch (error) {
-    console.error('統計エラー:', error);
-    await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
   }
-}
 
   async handleSearchCommand(interaction) {
     const subcommand = interaction.options.getSubcommand();
@@ -576,7 +577,8 @@ async handleStatsCommand(interaction) {
       await interaction.reply(`🔍 "${keyword}" に一致するアイテムが見つかりませんでした。`);
     }
   }
-// Google Sheets操作メソッド
+
+  // Google Sheets操作メソッド
   async getNextId(sheetName) {
     if (!this.auth) return Math.floor(Math.random() * 1000);
     
@@ -710,7 +712,8 @@ async handleStatsCommand(interaction) {
       return `${statusEmoji[status] || '📋'} [${id}] ${title} - ${author} (${status})`;
     });
   }
-async addMovie(title, memo) {
+
+  async addMovie(title, memo) {
     if (!this.auth) return Math.floor(Math.random() * 1000);
     
     const auth = await this.auth.getClient();
@@ -730,63 +733,60 @@ async addMovie(title, memo) {
     return id;
   }
 
-  // watchMovie メソッドの修正版（映画情報を返すように）
-async watchMovie(id) {
-  const movieInfo = await this.updateMovieStatus(id, 'watched');
-  return movieInfo;
-}
-
-// skipMovie メソッドの修正版（映画情報を返すように）
-async skipMovie(id) {
-  const movieInfo = await this.updateMovieStatus(id, 'missed');
-  return movieInfo;
-}
-
-  // updateMovieStatus メソッドの修正版（映画情報を返すように）
-async updateMovieStatus(id, status) {
-  if (!this.auth) {
-    return { id, title: 'テスト映画', memo: 'テストメモ' };
+  async watchMovie(id) {
+    const movieInfo = await this.updateMovieStatus(id, 'watched');
+    return movieInfo;
   }
-  
-  const auth = await this.auth.getClient();
-  const date = new Date().toISOString().slice(0, 10);
-  
-  try {
-    const response = await this.sheets.spreadsheets.values.get({
-      auth,
-      spreadsheetId: this.spreadsheetId,
-      range: 'movies_master!A:F'
-    });
+
+  async skipMovie(id) {
+    const movieInfo = await this.updateMovieStatus(id, 'missed');
+    return movieInfo;
+  }
+
+  async updateMovieStatus(id, status) {
+    if (!this.auth) {
+      return { id, title: 'テスト映画', memo: 'テストメモ' };
+    }
     
-    const values = response.data.values || [];
-    const rowIndex = values.findIndex(row => row[0] == id);
+    const auth = await this.auth.getClient();
+    const date = new Date().toISOString().slice(0, 10);
     
-    if (rowIndex !== -1) {
-      // ステータス更新
-      await this.sheets.spreadsheets.values.update({
+    try {
+      const response = await this.sheets.spreadsheets.values.get({
         auth,
         spreadsheetId: this.spreadsheetId,
-        range: `movies_master!E${rowIndex + 1}:F${rowIndex + 1}`,
-        valueInputOption: 'RAW',
-        resource: {
-          values: [[status, date]]
-        }
+        range: 'movies_master!A:F'
       });
       
-      // 映画情報を返す
-      const row = values[rowIndex];
-      return {
-        id: row[0],
-        title: row[2],
-        memo: row[3]
-      };
+      const values = response.data.values || [];
+      const rowIndex = values.findIndex(row => row[0] == id);
+      
+      if (rowIndex !== -1) {
+        // ステータス更新
+        await this.sheets.spreadsheets.values.update({
+          auth,
+          spreadsheetId: this.spreadsheetId,
+          range: `movies_master!E${rowIndex + 1}:F${rowIndex + 1}`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [[status, date]]
+          }
+        });
+        
+        // 映画情報を返す
+        const row = values[rowIndex];
+        return {
+          id: row[0],
+          title: row[2],
+          memo: row[3]
+        };
+      }
+    } catch (error) {
+      console.error('映画ステータス更新エラー:', error);
     }
-  } catch (error) {
-    console.error('映画ステータス更新エラー:', error);
+    
+    return null;
   }
-  
-  return null;
-}
 
   async getMovies() {
     if (!this.auth) return ['🎬 [1] テスト映画 (want_to_watch)'];
@@ -831,64 +831,60 @@ async updateMovieStatus(id, status) {
     return id;
   }
 
-  // doneActivity メソッドの修正版（活動情報を返すように）
-async doneActivity(id) {
-  const activityInfo = await this.updateActivityStatus(id, 'done');
-  return activityInfo;
-}
-
-// skipActivity メソッドの修正版（活動情報を返すように）
-async skipActivity(id) {
-  const activityInfo = await this.updateActivityStatus(id, 'skipped');
-  return activityInfo;
-}
-
-  // updateActivityStatus メソッドの修正版（活動情報を返すように）
-async updateActivityStatus(id, status) {
-  if (!this.auth) {
-    return { id, content: 'テスト活動', memo: 'テストメモ' };
+  async doneActivity(id) {
+    const activityInfo = await this.updateActivityStatus(id, 'done');
+    return activityInfo;
   }
-  
-  const auth = await this.auth.getClient();
-  const date = new Date().toISOString().slice(0, 10);
-  
-  try {
-    const response = await this.sheets.spreadsheets.values.get({
-      auth,
-      spreadsheetId: this.spreadsheetId,
-      range: 'activities_master!A:F'
-    });
+
+  async skipActivity(id) {
+    const activityInfo = await this.updateActivityStatus(id, 'skipped');
+    return activityInfo;
+  }
+
+  async updateActivityStatus(id, status) {
+    if (!this.auth) {
+      return { id, content: 'テスト活動', memo: 'テストメモ' };
+    }
     
-    const values = response.data.values || [];
-    const rowIndex = values.findIndex(row => row[0] == id);
+    const auth = await this.auth.getClient();
+    const date = new Date().toISOString().slice(0, 10);
     
-    if (rowIndex !== -1) {
-      // ステータス更新
-      await this.sheets.spreadsheets.values.update({
+    try {
+      const response = await this.sheets.spreadsheets.values.get({
         auth,
         spreadsheetId: this.spreadsheetId,
-        range: `activities_master!E${rowIndex + 1}:F${rowIndex + 1}`,
-        valueInputOption: 'RAW',
-        resource: {
-          values: [[status, date]]
-        }
+        range: 'activities_master!A:F'
       });
       
-      // 活動情報を返す
-      const row = values[rowIndex];
-      return {
-        id: row[0],
-        content: row[2],
-        memo: row[3]
-      };
+      const values = response.data.values || [];
+      const rowIndex = values.findIndex(row => row[0] == id);
+      
+      if (rowIndex !== -1) {
+        // ステータス更新
+        await this.sheets.spreadsheets.values.update({
+          auth,
+          spreadsheetId: this.spreadsheetId,
+          range: `activities_master!E${rowIndex + 1}:F${rowIndex + 1}`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [[status, date]]
+          }
+        });
+        
+        // 活動情報を返す
+        const row = values[rowIndex];
+        return {
+          id: row[0],
+          content: row[2],
+          memo: row[3]
+        };
+      }
+    } catch (error) {
+      console.error('活動ステータス更新エラー:', error);
     }
-  } catch (error) {
-    console.error('活動ステータス更新エラー:', error);
+    
+    return null;
   }
-  
-  return null;
-}
-
 
   async getActivities() {
     if (!this.auth) return ['🎯 [1] テスト活動 (planned)'];
@@ -912,7 +908,8 @@ async updateActivityStatus(id, status) {
       return `${statusEmoji[status] || '🎯'} [${id}] ${content} (${status})`;
     });
   }
-async addDailyReport(category, id, content) {
+
+  async addDailyReport(category, id, content) {
     if (!this.auth) return Math.floor(Math.random() * 1000);
     
     const auth = await this.auth.getClient();
@@ -988,7 +985,8 @@ async addDailyReport(category, id, content) {
     
     return null;
   }
-// 定期通知機能のセットアップ
+
+  // 定期通知機能のセットアップ
   setupScheduledTasks() {
     const cron = require('node-cron');
     console.log('定期通知機能を初期化しています...');
@@ -1025,83 +1023,80 @@ async addDailyReport(category, id, content) {
   }
 
   // 通知チャンネルを取得するヘルパーメソッド
-getNotificationChannel() {
-  console.log('=== チャンネル取得開始 ===');
-  
-  // 方法1: 環境変数で指定されたチャンネル
-  if (process.env.NOTIFICATION_CHANNEL_ID) {
-    console.log('環境変数のチャンネルIDを確認中:', process.env.NOTIFICATION_CHANNEL_ID);
-    const channel = this.client.channels.cache.get(process.env.NOTIFICATION_CHANNEL_ID);
-    if (channel) {
-      console.log('指定チャンネル見つかりました:', channel.name);
-      return channel;
-    } else {
-      console.log('指定チャンネルが見つかりませんでした');
-    }
-  }
-  
-  // 方法2: ギルドから直接取得（最も確実）
-  console.log('ギルドからチャンネルを取得中...');
-  const guild = this.client.guilds.cache.first();
-  console.log('ギルド:', guild ? guild.name : 'なし');
-  
-  if (guild) {
-    console.log('ギルドのチャンネル数:', guild.channels.cache.size);
+  getNotificationChannel() {
+    console.log('=== チャンネル取得開始 ===');
     
-    // テキストチャンネルを検索
-    const textChannels = guild.channels.cache.filter(ch => ch.type === 0);
-    console.log('テキストチャンネル数:', textChannels.size);
-    
-    if (textChannels.size > 0) {
-      const channel = textChannels.first();
-      console.log('選択したチャンネル:', channel.name, 'ID:', channel.id);
-      return channel;
-    }
-  }
-  
-  console.log('チャンネルが見つかりませんでした');
-  return null;
-}
-
-async sendMorningReminder() {
-  try {
-    const readingBooks = await this.getCurrentReadingBooks();
-    
-    if (readingBooks.length > 0) {
-      const channel = this.getNotificationChannel();
+    // 方法1: 環境変数で指定されたチャンネル
+    if (process.env.NOTIFICATION_CHANNEL_ID) {
+      console.log('環境変数のチャンネルIDを確認中:', process.env.NOTIFICATION_CHANNEL_ID);
+      const channel = this.client.channels.cache.get(process.env.NOTIFICATION_CHANNEL_ID);
       if (channel) {
-        const embed = new EmbedBuilder()
-          .setTitle('☀️ おはようございます！')
-          .setDescription('今日はどの本を読みますか？📚')
-          .addFields({
-            name: '📖 読書中の本',
-            value: readingBooks.map(book => `• [${book.id}] ${book.title} - ${book.author}`).join('\n'),
-            inline: false
-          })
-          .setColor('#ffeb3b')
-          .setTimestamp();
-        
-        await channel.send({ embeds: [embed] });
-        console.log('朝の通知を送信しました');
+        console.log('指定チャンネル見つかりました:', channel.name);
+        return channel;
       } else {
-        console.log('通知チャンネルが見つかりませんでした');
+        console.log('指定チャンネルが見つかりませんでした');
       }
     }
-  } catch (error) {
-    console.error('朝の通知エラー:', error);
+    
+    // 方法2: ギルドから直接取得（最も確実）
+    console.log('ギルドからチャンネルを取得中...');
+    const guild = this.client.guilds.cache.first();
+    console.log('ギルド:', guild ? guild.name : 'なし');
+    
+    if (guild) {
+      console.log('ギルドのチャンネル数:', guild.channels.cache.size);
+      
+      // テキストチャンネルを検索
+      const textChannels = guild.channels.cache.filter(ch => ch.type === 0);
+      console.log('テキストチャンネル数:', textChannels.size);
+      
+      if (textChannels.size > 0) {
+        const channel = textChannels.first();
+        console.log('選択したチャンネル:', channel.name, 'ID:', channel.id);
+        return channel;
+      }
+    }
+    
+    console.log('チャンネルが見つかりませんでした');
+    return null;
   }
-}
 
-async sendWeeklyReport() {
-  try {
-    console.log('=== 週次レポート開始 ===');
-    
-    const weeklyStats = await this.getThisWeekStats();
-    console.log('週次統計取得完了:', weeklyStats);
-    
-    // 朝の通知と同じ方法でチャンネル取得
-    const readingBooks = await this.getCurrentReadingBooks();
-    if (readingBooks.length > 0) {
+  async sendMorningReminder() {
+    try {
+      const readingBooks = await this.getCurrentReadingBooks();
+      
+      if (readingBooks.length > 0) {
+        const channel = this.getNotificationChannel();
+        if (channel) {
+          const embed = new EmbedBuilder()
+            .setTitle('☀️ おはようございます！')
+            .setDescription('今日はどの本を読みますか？📚')
+            .addFields({
+              name: '📖 読書中の本',
+              value: readingBooks.map(book => `• [${book.id}] ${book.title} - ${book.author}`).join('\n'),
+              inline: false
+            })
+            .setColor('#ffeb3b')
+            .setTimestamp();
+          
+          await channel.send({ embeds: [embed] });
+          console.log('朝の通知を送信しました');
+        } else {
+          console.log('通知チャンネルが見つかりませんでした');
+        }
+      }
+    } catch (error) {
+      console.error('朝の通知エラー:', error);
+    }
+  }
+
+  async sendWeeklyReport() {
+    try {
+      console.log('=== 週次レポート開始 ===');
+      
+      const weeklyStats = await this.getThisWeekStats();
+      console.log('週次統計取得完了:', weeklyStats);
+      
       const channel = this.getNotificationChannel();
       if (channel) {
         const embed = new EmbedBuilder()
@@ -1119,101 +1114,82 @@ async sendWeeklyReport() {
         await channel.send({ embeds: [embed] });
         console.log('✅ 週次レポートを送信しました');
       }
-    } else {
-      // 読書中の本がない場合でも週次レポートは送信
-      const channel = this.getNotificationChannel();
-      if (channel) {
-        const embed = new EmbedBuilder()
-          .setTitle('📅 今週の活動レポート')
-          .setDescription('今週も頑張りました！🎉')
-          .addFields(
-            { name: '📚 読了した本', value: weeklyStats.finishedBooks > 0 ? `${weeklyStats.finishedBooks}冊` : 'なし', inline: true },
-            { name: '🎬 視聴した映画', value: weeklyStats.watchedMovies > 0 ? `${weeklyStats.watchedMovies}本` : 'なし', inline: true },
-            { name: '🎯 完了した活動', value: weeklyStats.completedActivities > 0 ? `${weeklyStats.completedActivities}件` : 'なし', inline: true }
-          )
-          .setColor('#4caf50')
-          .setFooter({ text: 'お疲れ様でした！来週も頑張りましょう！' })
-          .setTimestamp();
-        
-        await channel.send({ embeds: [embed] });
-        console.log('✅ 週次レポートを送信しました');
-      }
+    } catch (error) {
+      console.error('❌ 週次レポートエラー:', error);
     }
-  } catch (error) {
-    console.error('❌ 週次レポートエラー:', error);
   }
-}
-	
-async sendMonthlyReport() {
-  try {
-    const monthlyStats = await this.getThisMonthStats();
-    const channel = this.getNotificationChannel();
-    
-    if (channel) {
-      const bookList = monthlyStats.bookTitles.length > 0 
-        ? monthlyStats.bookTitles.slice(0, 5).join('\n') 
-        : 'なし';
-      
-      const embed = new EmbedBuilder()
-        .setTitle('🗓️ 今月の活動レポート')
-        .setDescription('今月の成果を振り返ってみましょう！✨')
-        .addFields(
-          { name: '📚 読了冊数', value: `${monthlyStats.finishedBooks}冊`, inline: true },
-          { name: '🎬 視聴本数', value: `${monthlyStats.watchedMovies}本`, inline: true },
-          { name: '🎯 完了活動', value: `${monthlyStats.completedActivities}件`, inline: true },
-          { name: '📝 日報件数', value: `${monthlyStats.dailyReports}件`, inline: true },
-          { name: '🏆 今月読了した本', value: bookList, inline: false }
-        )
-        .setColor('#9c27b0')
-        .setFooter({ text: '素晴らしい1ヶ月でした！' })
-        .setTimestamp();
-      
-      await channel.send({ embeds: [embed] });
-      console.log('月次レポートを送信しました');
-    }
-  } catch (error) {
-    console.error('月次レポートエラー:', error);
-  }
-}
 
-async checkAbandonedItems() {
-  try {
-    const abandonedItems = await this.getAbandonedItems();
-    
-    if (abandonedItems.movies.length > 0 || abandonedItems.activities.length > 0) {
+  async sendMonthlyReport() {
+    try {
+      const monthlyStats = await this.getThisMonthStats();
       const channel = this.getNotificationChannel();
+      
       if (channel) {
+        const bookList = monthlyStats.bookTitles.length > 0 
+          ? monthlyStats.bookTitles.slice(0, 5).join('\n') 
+          : 'なし';
+        
         const embed = new EmbedBuilder()
-          .setTitle('⚠️ 放置されているアイテムがあります')
-          .setDescription('1週間以上放置されているものをチェックしてみませんか？')
-          .setColor('#ff9800')
+          .setTitle('🗓️ 今月の活動レポート')
+          .setDescription('今月の成果を振り返ってみましょう！✨')
+          .addFields(
+            { name: '📚 読了冊数', value: `${monthlyStats.finishedBooks}冊`, inline: true },
+            { name: '🎬 視聴本数', value: `${monthlyStats.watchedMovies}本`, inline: true },
+            { name: '🎯 完了活動', value: `${monthlyStats.completedActivities}件`, inline: true },
+            { name: '📝 日報件数', value: `${monthlyStats.dailyReports}件`, inline: true },
+            { name: '🏆 今月読了した本', value: bookList, inline: false }
+          )
+          .setColor('#9c27b0')
+          .setFooter({ text: '素晴らしい1ヶ月でした！' })
           .setTimestamp();
         
-        if (abandonedItems.movies.length > 0) {
-          embed.addFields({
-            name: '🎬 観たい映画（1週間放置）',
-            value: abandonedItems.movies.slice(0, 5).map(movie => `• [${movie.id}] ${movie.title}`).join('\n'),
-            inline: false
-          });
-        }
-        
-        if (abandonedItems.activities.length > 0) {
-          embed.addFields({
-            name: '🎯 予定中の活動（1週間放置）',
-            value: abandonedItems.activities.slice(0, 5).map(activity => `• [${activity.id}] ${activity.content}`).join('\n'),
-            inline: false
-          });
-        }
-        
         await channel.send({ embeds: [embed] });
-        console.log('放置アラートを送信しました');
+        console.log('月次レポートを送信しました');
       }
+    } catch (error) {
+      console.error('月次レポートエラー:', error);
     }
-  } catch (error) {
-    console.error('放置アラートエラー:', error);
   }
-}
-// 統計取得のヘルパーメソッド
+
+  async checkAbandonedItems() {
+    try {
+      const abandonedItems = await this.getAbandonedItems();
+      
+      if (abandonedItems.movies.length > 0 || abandonedItems.activities.length > 0) {
+        const channel = this.getNotificationChannel();
+        if (channel) {
+          const embed = new EmbedBuilder()
+            .setTitle('⚠️ 放置されているアイテムがあります')
+            .setDescription('1週間以上放置されているものをチェックしてみませんか？')
+            .setColor('#ff9800')
+            .setTimestamp();
+          
+          if (abandonedItems.movies.length > 0) {
+            embed.addFields({
+              name: '🎬 観たい映画（1週間放置）',
+              value: abandonedItems.movies.slice(0, 5).map(movie => `• [${movie.id}] ${movie.title}`).join('\n'),
+              inline: false
+            });
+          }
+          
+          if (abandonedItems.activities.length > 0) {
+            embed.addFields({
+              name: '🎯 予定中の活動（1週間放置）',
+              value: abandonedItems.activities.slice(0, 5).map(activity => `• [${activity.id}] ${activity.content}`).join('\n'),
+              inline: false
+            });
+          }
+          
+          await channel.send({ embeds: [embed] });
+          console.log('放置アラートを送信しました');
+        }
+      }
+    } catch (error) {
+      console.error('放置アラートエラー:', error);
+    }
+  }
+
+  // 統計取得のヘルパーメソッド
   async getCurrentReadingBooks() {
     if (!this.auth) return [{ id: 1, title: 'テスト本', author: 'テスト作者' }];
     
@@ -1235,106 +1211,102 @@ async checkAbandonedItems() {
   }
 
   async getThisWeekStats() {
-  // 実際の週次統計を取得
-  return await this.getRealWeeklyStats();
-}
+    return await this.getRealWeeklyStats();
+  }
 
   async getThisMonthStats() {
-  const monthStats = await this.getRealMonthlyStats();
-  
-  // 今月読了した本のタイトルも取得
-  const bookTitles = await this.getMonthlyBookTitles();
-  
-  return {
-    finishedBooks: monthStats.finishedBooks,
-    watchedMovies: monthStats.watchedMovies,
-    completedActivities: monthStats.completedActivities,
-    dailyReports: monthStats.reports,
-    bookTitles: bookTitles
-  };
-}
-
-  async getAbandonedItems() {
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const oneWeekAgoStr = oneWeekAgo.toISOString().slice(0, 10);
-  
-  if (!this.auth) return {
-    movies: [{ id: 1, title: 'テスト放置映画' }],
-    activities: [{ id: 1, content: 'テスト放置活動' }]
-  };
-  
-  try {
-    const auth = await this.auth.getClient();
-    
-    const [moviesData, activitiesData] = await Promise.all([
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
-      }),
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'activities_master!A:F'
-      })
-    ]);
-    
-    // 1週間以上前に登録されて、まだ「観たい」「予定」状態のアイテム
-    const abandonedMovies = moviesData.data.values?.slice(1)
-      .filter(row => 
-        row[4] === 'want_to_watch' && // 観たい状態
-        row[1] && // 登録日時がある
-        row[1].slice(0, 10) <= oneWeekAgoStr // 1週間以上前
-      )
-      .map(row => ({ id: row[0], title: row[2] })) || [];
-    
-    const abandonedActivities = activitiesData.data.values?.slice(1)
-      .filter(row => 
-        row[4] === 'planned' && // 予定状態
-        row[1] && // 登録日時がある
-        row[1].slice(0, 10) <= oneWeekAgoStr // 1週間以上前
-      )
-      .map(row => ({ id: row[0], content: row[2] })) || [];
+    const monthStats = await this.getRealMonthlyStats();
+    const bookTitles = await this.getMonthlyBookTitles();
     
     return {
-      movies: abandonedMovies,
-      activities: abandonedActivities
+      finishedBooks: monthStats.finishedBooks,
+      watchedMovies: monthStats.watchedMovies,
+      completedActivities: monthStats.completedActivities,
+      dailyReports: monthStats.reports,
+      bookTitles: bookTitles
     };
-  } catch (error) {
-    console.error('放置アイテム取得エラー:', error);
-    return { movies: [], activities: [] };
   }
-}
-	
-  async getMonthlyBookTitles() {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthStartStr = monthStart.toISOString().slice(0, 10);
-  
-  if (!this.auth) return ['テスト本1', 'テスト本2'];
-  
-  try {
-    const auth = await this.auth.getClient();
-    const response = await this.sheets.spreadsheets.values.get({
-      auth,
-      spreadsheetId: this.spreadsheetId,
-      range: 'books_master!A:G'
-    });
-    
-    const values = response.data.values || [];
-    const monthlyBooks = values.slice(1)
-      .filter(row => 
-        row[5] === 'finished' && // 読了状態
-        row[6] && // 読了日がある
-        row[6] >= monthStartStr // 今月読了
-      )
-      .map(row => row[2]); // タイトルのみ取得
-    
-    return monthlyBooks;
-  } catch (error) {
-    console.error('月次読書タイトル取得エラー:', error);
-    return [];
-  }
-}
 
-// 検索機能
+  async getAbandonedItems() {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const oneWeekAgoStr = oneWeekAgo.toISOString().slice(0, 10);
+    
+    if (!this.auth) return {
+      movies: [{ id: 1, title: 'テスト放置映画' }],
+      activities: [{ id: 1, content: 'テスト放置活動' }]
+    };
+    
+    try {
+      const auth = await this.auth.getClient();
+      
+      const [moviesData, activitiesData] = await Promise.all([
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
+        }),
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'activities_master!A:F'
+        })
+      ]);
+      
+      const abandonedMovies = moviesData.data.values?.slice(1)
+        .filter(row => 
+          row[4] === 'want_to_watch' && 
+          row[1] && 
+          row[1].slice(0, 10) <= oneWeekAgoStr
+        )
+        .map(row => ({ id: row[0], title: row[2] })) || [];
+      
+      const abandonedActivities = activitiesData.data.values?.slice(1)
+        .filter(row => 
+          row[4] === 'planned' && 
+          row[1] && 
+          row[1].slice(0, 10) <= oneWeekAgoStr
+        )
+        .map(row => ({ id: row[0], content: row[2] })) || [];
+      
+      return {
+        movies: abandonedMovies,
+        activities: abandonedActivities
+      };
+    } catch (error) {
+      console.error('放置アイテム取得エラー:', error);
+      return { movies: [], activities: [] };
+    }
+  }
+
+  async getMonthlyBookTitles() {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthStartStr = monthStart.toISOString().slice(0, 10);
+    
+    if (!this.auth) return ['テスト本1', 'テスト本2'];
+    
+    try {
+      const auth = await this.auth.getClient();
+      const response = await this.sheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range: 'books_master!A:G'
+      });
+      
+      const values = response.data.values || [];
+      const monthlyBooks = values.slice(1)
+        .filter(row => 
+          row[5] === 'finished' && 
+          row[6] && 
+          row[6] >= monthStartStr
+        )
+        .map(row => row[2]);
+      
+      return monthlyBooks;
+    } catch (error) {
+      console.error('月次読書タイトル取得エラー:', error);
+      return [];
+    }
+  }
+
+  // 検索機能
   async searchBooks(keyword) {
     if (!this.auth) return [`📚 [1] テスト本 - テスト作者 (registered) - キーワード: ${keyword}`];
     
@@ -1443,313 +1415,313 @@ async checkAbandonedItems() {
       return [];
     }
   }
-	// 実際の統計データ取得
-	
-async createSummaryStats() {
-  const [bookStats, movieStats, activityStats] = await Promise.all([
-    this.getBookCounts(),
-    this.getMovieCounts(),
-    this.getActivityCounts()
-  ]);
-  
-  return new EmbedBuilder()
-    .setTitle('📊 全体統計')
-    .setColor('#3498db')
-    .addFields(
-      { name: '📚 本', value: `登録: ${bookStats.total}冊\n読書中: ${bookStats.reading}冊\n読了: ${bookStats.finished}冊`, inline: true },
-      { name: '🎬 映画', value: `登録: ${movieStats.total}本\n観たい: ${movieStats.wantToWatch}本\n視聴済み: ${movieStats.watched}本`, inline: true },
-      { name: '🎯 活動', value: `登録: ${activityStats.total}件\n予定: ${activityStats.planned}件\n完了: ${activityStats.done}件`, inline: true }
-    )
-    .setTimestamp();
-}
 
-async createWeeklyStats() {
-  const weekStats = await this.getRealWeeklyStats();
-  
-  return new EmbedBuilder()
-    .setTitle('📅 今週の統計')
-    .setColor('#2ecc71')
-    .addFields(
-      { name: '📚 読了', value: `${weekStats.finishedBooks}冊`, inline: true },
-      { name: '🎬 視聴', value: `${weekStats.watchedMovies}本`, inline: true },
-      { name: '🎯 完了', value: `${weekStats.completedActivities}件`, inline: true }
-    )
-    .setTimestamp();
-}
-
-async createMonthlyStats() {
-  const monthStats = await this.getRealMonthlyStats();
-  
-  return new EmbedBuilder()
-    .setTitle('🗓️ 今月の統計')
-    .setColor('#9b59b6')
-    .addFields(
-      { name: '📚 読了', value: `${monthStats.finishedBooks}冊`, inline: true },
-      { name: '🎬 視聴', value: `${monthStats.watchedMovies}本`, inline: true },
-      { name: '🎯 完了', value: `${monthStats.completedActivities}件`, inline: true },
-      { name: '📝 日報', value: `${monthStats.reports}件`, inline: true }
-    )
-    .setTimestamp();
-}
-
-async createBookStats() {
-  const bookStats = await this.getDetailedBookCounts();
-  
-  return new EmbedBuilder()
-    .setTitle('📚 読書統計詳細')
-    .setColor('#e74c3c')
-    .addFields(
-      { name: 'ステータス別', value: `登録済み: ${bookStats.registered}冊\n読書中: ${bookStats.reading}冊\n読了: ${bookStats.finished}冊`, inline: true },
-      { name: '期間別', value: `今月: ${bookStats.thisMonth}冊\n今週: ${bookStats.thisWeek}冊`, inline: true }
-    )
-    .setTimestamp();
-}
-
-async createCurrentStats() {
-  const currentStats = await this.getRealCurrentProgress();
-  
-  const readingList = currentStats.readingBooks.length > 0 
-    ? currentStats.readingBooks.map(book => `• [${book.id}] ${book.title}`).join('\n')
-    : 'なし';
-  
-  const movieList = currentStats.wantToWatchMovies.length > 0
-    ? currentStats.wantToWatchMovies.slice(0, 5).map(movie => `• [${movie.id}] ${movie.title}`).join('\n')
-    : 'なし';
-  
-  return new EmbedBuilder()
-    .setTitle('⚡ 現在の進行状況')
-    .setColor('#f39c12')
-    .addFields(
-      { name: '📖 読書中', value: readingList, inline: false },
-      { name: '🎬 観たい映画', value: movieList, inline: false }
-    )
-    .setTimestamp();
-}
-
-// データ取得メソッド
-async getBookCounts() {
-  if (!this.auth) return { total: 3, reading: 1, finished: 2, registered: 0 };
-  
-  try {
-    const auth = await this.auth.getClient();
-    const response = await this.sheets.spreadsheets.values.get({
-      auth,
-      spreadsheetId: this.spreadsheetId,
-      range: 'books_master!A:G'
-    });
-    
-    const values = response.data.values || [];
-    const data = values.slice(1); // ヘッダー除く
-    
-    return {
-      total: data.length,
-      reading: data.filter(row => row[5] === 'reading').length,
-      finished: data.filter(row => row[5] === 'finished').length,
-      registered: data.filter(row => row[5] === 'registered').length
-    };
-  } catch (error) {
-    console.error('本の統計取得エラー:', error);
-    return { total: 0, reading: 0, finished: 0, registered: 0 };
-  }
-}
-
-async getMovieCounts() {
-  if (!this.auth) return { total: 2, wantToWatch: 1, watched: 1 };
-  
-  try {
-    const auth = await this.auth.getClient();
-    const response = await this.sheets.spreadsheets.values.get({
-      auth,
-      spreadsheetId: this.spreadsheetId,
-      range: 'movies_master!A:F'
-    });
-    
-    const values = response.data.values || [];
-    const data = values.slice(1);
-    
-    return {
-      total: data.length,
-      wantToWatch: data.filter(row => row[4] === 'want_to_watch').length,
-      watched: data.filter(row => row[4] === 'watched').length
-    };
-  } catch (error) {
-    console.error('映画の統計取得エラー:', error);
-    return { total: 0, wantToWatch: 0, watched: 0 };
-  }
-}
-
-async getActivityCounts() {
-  if (!this.auth) return { total: 1, planned: 1, done: 0 };
-  
-  try {
-    const auth = await this.auth.getClient();
-    const response = await this.sheets.spreadsheets.values.get({
-      auth,
-      spreadsheetId: this.spreadsheetId,
-      range: 'activities_master!A:F'
-    });
-    
-    const values = response.data.values || [];
-    const data = values.slice(1);
-    
-    return {
-      total: data.length,
-      planned: data.filter(row => row[4] === 'planned').length,
-      done: data.filter(row => row[4] === 'done').length
-    };
-  } catch (error) {
-    console.error('活動の統計取得エラー:', error);
-    return { total: 0, planned: 0, done: 0 };
-  }
-}
-
-async getRealWeeklyStats() {
-  console.log('=== 週次統計取得開始 ===');
-  
-  const now = new Date();
-  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-  const weekStartStr = weekStart.toISOString().slice(0, 10);
-  
-  console.log('今週の開始日:', weekStartStr);
-  
-  if (!this.auth) {
-    console.log('認証なし - テストデータを返します');
-    return { finishedBooks: 1, watchedMovies: 0, completedActivities: 1 };
-  }
-  
-  try {
-    const auth = await this.auth.getClient();
-    console.log('Google認証成功');
-    
-    // 今週完了した本・映画・活動をカウント
-    const [booksData, moviesData, activitiesData] = await Promise.all([
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'books_master!A:G'
-      }),
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
-      }),
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'activities_master!A:F'
-      })
+  // 実際の統計データ取得
+  async createSummaryStats() {
+    const [bookStats, movieStats, activityStats] = await Promise.all([
+      this.getBookCounts(),
+      this.getMovieCounts(),
+      this.getActivityCounts()
     ]);
     
-    console.log('スプレッドシートデータ取得完了');
-    
-    const finishedBooks = booksData.data.values?.slice(1).filter(row => 
-      row[5] === 'finished' && row[6] && row[6] >= weekStartStr
-    ).length || 0;
-    
-    const watchedMovies = moviesData.data.values?.slice(1).filter(row => 
-      row[4] === 'watched' && row[5] && row[5] >= weekStartStr
-    ).length || 0;
-    
-    const completedActivities = activitiesData.data.values?.slice(1).filter(row => 
-      row[4] === 'done' && row[5] && row[5] >= weekStartStr
-    ).length || 0;
-    
-    const result = { finishedBooks, watchedMovies, completedActivities };
-    console.log('週次統計結果:', result);
-    
-    return result;
-  } catch (error) {
-    console.error('週次統計取得エラー:', error);
-    return { finishedBooks: 0, watchedMovies: 0, completedActivities: 0 };
+    return new EmbedBuilder()
+      .setTitle('📊 全体統計')
+      .setColor('#3498db')
+      .addFields(
+        { name: '📚 本', value: `登録: ${bookStats.total}冊\n読書中: ${bookStats.reading}冊\n読了: ${bookStats.finished}冊`, inline: true },
+        { name: '🎬 映画', value: `登録: ${movieStats.total}本\n観たい: ${movieStats.wantToWatch}本\n視聴済み: ${movieStats.watched}本`, inline: true },
+        { name: '🎯 活動', value: `登録: ${activityStats.total}件\n予定: ${activityStats.planned}件\n完了: ${activityStats.done}件`, inline: true }
+      )
+      .setTimestamp();
   }
-}
 
-async getRealMonthlyStats() {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthStartStr = monthStart.toISOString().slice(0, 10);
-  
-  if (!this.auth) return { finishedBooks: 2, watchedMovies: 1, completedActivities: 1, reports: 5 };
-  
-  try {
-    const auth = await this.auth.getClient();
+  async createWeeklyStats() {
+    const weekStats = await this.getRealWeeklyStats();
     
-    const [booksData, moviesData, activitiesData, reportsData] = await Promise.all([
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'books_master!A:G'
-      }),
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
-      }),
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'activities_master!A:F'
-      }),
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'daily_reports!A:E'
-      })
-    ]);
-    
-    const finishedBooks = booksData.data.values?.slice(1).filter(row => 
-      row[5] === 'finished' && row[6] && row[6] >= monthStartStr
-    ).length || 0;
-    
-    const watchedMovies = moviesData.data.values?.slice(1).filter(row => 
-      row[4] === 'watched' && row[5] && row[5] >= monthStartStr
-    ).length || 0;
-    
-    const completedActivities = activitiesData.data.values?.slice(1).filter(row => 
-      row[4] === 'done' && row[5] && row[5] >= monthStartStr
-    ).length || 0;
-    
-    const reports = reportsData.data.values?.slice(1).filter(row => 
-      row[1] && row[1] >= monthStartStr
-    ).length || 0;
-    
-    return { finishedBooks, watchedMovies, completedActivities, reports };
-  } catch (error) {
-    console.error('月次統計取得エラー:', error);
-    return { finishedBooks: 0, watchedMovies: 0, completedActivities: 0, reports: 0 };
+    return new EmbedBuilder()
+      .setTitle('📅 今週の統計')
+      .setColor('#2ecc71')
+      .addFields(
+        { name: '📚 読了', value: `${weekStats.finishedBooks}冊`, inline: true },
+        { name: '🎬 視聴', value: `${weekStats.watchedMovies}本`, inline: true },
+        { name: '🎯 完了', value: `${weekStats.completedActivities}件`, inline: true }
+      )
+      .setTimestamp();
   }
-}
 
-async getDetailedBookCounts() {
-  const baseStats = await this.getBookCounts();
-  const weeklyStats = await this.getRealWeeklyStats();
-  const monthlyStats = await this.getRealMonthlyStats();
-  
-  return {
-    ...baseStats,
-    thisWeek: weeklyStats.finishedBooks,
-    thisMonth: monthlyStats.finishedBooks
-  };
-}
-
-async getRealCurrentProgress() {
-  if (!this.auth) return {
-    readingBooks: [{ id: 1, title: 'テスト本' }],
-    wantToWatchMovies: [{ id: 1, title: 'テスト映画' }]
-  };
-  
-  try {
-    const auth = await this.auth.getClient();
+  async createMonthlyStats() {
+    const monthStats = await this.getRealMonthlyStats();
     
-    const [booksData, moviesData] = await Promise.all([
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'books_master!A:G'
-      }),
-      this.sheets.spreadsheets.values.get({
-        auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
-      })
-    ]);
-    
-    const readingBooks = booksData.data.values?.slice(1)
-      .filter(row => row[5] === 'reading')
-      .map(row => ({ id: row[0], title: row[2] })) || [];
-    
-    const wantToWatchMovies = moviesData.data.values?.slice(1)
-      .filter(row => row[4] === 'want_to_watch')
-      .map(row => ({ id: row[0], title: row[2] })) || [];
-    
-    return { readingBooks, wantToWatchMovies };
-  } catch (error) {
-    console.error('進行状況取得エラー:', error);
-    return { readingBooks: [], wantToWatchMovies: [] };
+    return new EmbedBuilder()
+      .setTitle('🗓️ 今月の統計')
+      .setColor('#9b59b6')
+      .addFields(
+        { name: '📚 読了', value: `${monthStats.finishedBooks}冊`, inline: true },
+        { name: '🎬 視聴', value: `${monthStats.watchedMovies}本`, inline: true },
+        { name: '🎯 完了', value: `${monthStats.completedActivities}件`, inline: true },
+        { name: '📝 日報', value: `${monthStats.reports}件`, inline: true }
+      )
+      .setTimestamp();
   }
-}
+
+  async createBookStats() {
+    const bookStats = await this.getDetailedBookCounts();
+    
+    return new EmbedBuilder()
+      .setTitle('📚 読書統計詳細')
+      .setColor('#e74c3c')
+      .addFields(
+        { name: 'ステータス別', value: `登録済み: ${bookStats.registered}冊\n読書中: ${bookStats.reading}冊\n読了: ${bookStats.finished}冊`, inline: true },
+        { name: '期間別', value: `今月: ${bookStats.thisMonth}冊\n今週: ${bookStats.thisWeek}冊`, inline: true }
+      )
+      .setTimestamp();
+  }
+
+  async createCurrentStats() {
+    const currentStats = await this.getRealCurrentProgress();
+    
+    const readingList = currentStats.readingBooks.length > 0 
+      ? currentStats.readingBooks.map(book => `• [${book.id}] ${book.title}`).join('\n')
+      : 'なし';
+    
+    const movieList = currentStats.wantToWatchMovies.length > 0
+      ? currentStats.wantToWatchMovies.slice(0, 5).map(movie => `• [${movie.id}] ${movie.title}`).join('\n')
+      : 'なし';
+    
+    return new EmbedBuilder()
+      .setTitle('⚡ 現在の進行状況')
+      .setColor('#f39c12')
+      .addFields(
+        { name: '📖 読書中', value: readingList, inline: false },
+        { name: '🎬 観たい映画', value: movieList, inline: false }
+      )
+      .setTimestamp();
+  }
+
+  // データ取得メソッド
+  async getBookCounts() {
+    if (!this.auth) return { total: 3, reading: 1, finished: 2, registered: 0 };
+    
+    try {
+      const auth = await this.auth.getClient();
+      const response = await this.sheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range: 'books_master!A:G'
+      });
+      
+      const values = response.data.values || [];
+      const data = values.slice(1); // ヘッダー除く
+      
+      return {
+        total: data.length,
+        reading: data.filter(row => row[5] === 'reading').length,
+        finished: data.filter(row => row[5] === 'finished').length,
+        registered: data.filter(row => row[5] === 'registered').length
+      };
+    } catch (error) {
+      console.error('本の統計取得エラー:', error);
+      return { total: 0, reading: 0, finished: 0, registered: 0 };
+    }
+  }
+
+  async getMovieCounts() {
+    if (!this.auth) return { total: 2, wantToWatch: 1, watched: 1 };
+    
+    try {
+      const auth = await this.auth.getClient();
+      const response = await this.sheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range: 'movies_master!A:F'
+      });
+      
+      const values = response.data.values || [];
+      const data = values.slice(1);
+      
+      return {
+        total: data.length,
+        wantToWatch: data.filter(row => row[4] === 'want_to_watch').length,
+        watched: data.filter(row => row[4] === 'watched').length
+      };
+    } catch (error) {
+      console.error('映画の統計取得エラー:', error);
+      return { total: 0, wantToWatch: 0, watched: 0 };
+    }
+  }
+
+  async getActivityCounts() {
+    if (!this.auth) return { total: 1, planned: 1, done: 0 };
+    
+    try {
+      const auth = await this.auth.getClient();
+      const response = await this.sheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range: 'activities_master!A:F'
+      });
+      
+      const values = response.data.values || [];
+      const data = values.slice(1);
+      
+      return {
+        total: data.length,
+        planned: data.filter(row => row[4] === 'planned').length,
+        done: data.filter(row => row[4] === 'done').length
+      };
+    } catch (error) {
+      console.error('活動の統計取得エラー:', error);
+      return { total: 0, planned: 0, done: 0 };
+    }
+  }
+
+  async getRealWeeklyStats() {
+    console.log('=== 週次統計取得開始 ===');
+    
+    const now = new Date();
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+    const weekStartStr = weekStart.toISOString().slice(0, 10);
+    
+    console.log('今週の開始日:', weekStartStr);
+    
+    if (!this.auth) {
+      console.log('認証なし - テストデータを返します');
+      return { finishedBooks: 1, watchedMovies: 0, completedActivities: 1 };
+    }
+    
+    try {
+      const auth = await this.auth.getClient();
+      console.log('Google認証成功');
+      
+      // 今週完了した本・映画・活動をカウント
+      const [booksData, moviesData, activitiesData] = await Promise.all([
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'books_master!A:G'
+        }),
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
+        }),
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'activities_master!A:F'
+        })
+      ]);
+      
+      console.log('スプレッドシートデータ取得完了');
+      
+      const finishedBooks = booksData.data.values?.slice(1).filter(row => 
+        row[5] === 'finished' && row[6] && row[6] >= weekStartStr
+      ).length || 0;
+      
+      const watchedMovies = moviesData.data.values?.slice(1).filter(row => 
+        row[4] === 'watched' && row[5] && row[5] >= weekStartStr
+      ).length || 0;
+      
+      const completedActivities = activitiesData.data.values?.slice(1).filter(row => 
+        row[4] === 'done' && row[5] && row[5] >= weekStartStr
+      ).length || 0;
+      
+      const result = { finishedBooks, watchedMovies, completedActivities };
+      console.log('週次統計結果:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('週次統計取得エラー:', error);
+      return { finishedBooks: 0, watchedMovies: 0, completedActivities: 0 };
+    }
+  }
+
+  async getRealMonthlyStats() {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthStartStr = monthStart.toISOString().slice(0, 10);
+    
+    if (!this.auth) return { finishedBooks: 2, watchedMovies: 1, completedActivities: 1, reports: 5 };
+    
+    try {
+      const auth = await this.auth.getClient();
+      
+      const [booksData, moviesData, activitiesData, reportsData] = await Promise.all([
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'books_master!A:G'
+        }),
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
+        }),
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'activities_master!A:F'
+        }),
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'daily_reports!A:E'
+        })
+      ]);
+      
+      const finishedBooks = booksData.data.values?.slice(1).filter(row => 
+        row[5] === 'finished' && row[6] && row[6] >= monthStartStr
+      ).length || 0;
+      
+      const watchedMovies = moviesData.data.values?.slice(1).filter(row => 
+        row[4] === 'watched' && row[5] && row[5] >= monthStartStr
+      ).length || 0;
+      
+      const completedActivities = activitiesData.data.values?.slice(1).filter(row => 
+        row[4] === 'done' && row[5] && row[5] >= monthStartStr
+      ).length || 0;
+      
+      const reports = reportsData.data.values?.slice(1).filter(row => 
+        row[1] && row[1] >= monthStartStr
+      ).length || 0;
+      
+      return { finishedBooks, watchedMovies, completedActivities, reports };
+    } catch (error) {
+      console.error('月次統計取得エラー:', error);
+      return { finishedBooks: 0, watchedMovies: 0, completedActivities: 0, reports: 0 };
+    }
+  }
+
+  async getDetailedBookCounts() {
+    const baseStats = await this.getBookCounts();
+    const weeklyStats = await this.getRealWeeklyStats();
+    const monthlyStats = await this.getRealMonthlyStats();
+    
+    return {
+      ...baseStats,
+      thisWeek: weeklyStats.finishedBooks,
+      thisMonth: monthlyStats.finishedBooks
+    };
+  }
+
+  async getRealCurrentProgress() {
+    if (!this.auth) return {
+      readingBooks: [{ id: 1, title: 'テスト本' }],
+      wantToWatchMovies: [{ id: 1, title: 'テスト映画' }]
+    };
+    
+    try {
+      const auth = await this.auth.getClient();
+      
+      const [booksData, moviesData] = await Promise.all([
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'books_master!A:G'
+        }),
+        this.sheets.spreadsheets.values.get({
+          auth, spreadsheetId: this.spreadsheetId, range: 'movies_master!A:F'
+        })
+      ]);
+      
+      const readingBooks = booksData.data.values?.slice(1)
+        .filter(row => row[5] === 'reading')
+        .map(row => ({ id: row[0], title: row[2] })) || [];
+      
+      const wantToWatchMovies = moviesData.data.values?.slice(1)
+        .filter(row => row[4] === 'want_to_watch')
+        .map(row => ({ id: row[0], title: row[2] })) || [];
+      
+      return { readingBooks, wantToWatchMovies };
+    } catch (error) {
+      console.error('進行状況取得エラー:', error);
+      return { readingBooks: [], wantToWatchMovies: [] };
+    }
+  }
 
   start() {
     this.client.login(process.env.DISCORD_TOKEN);
