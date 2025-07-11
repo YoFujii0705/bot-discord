@@ -395,10 +395,15 @@ setupEvents() {
         break;
       
       case 'skip':
-        const skipId = interaction.options.getInteger('id');
-        await this.skipActivity(skipId);
-        await interaction.reply(`😅 今回は見送りましたね。また機会があればチャレンジしてみてください！`);
-        break;
+  const skipId = interaction.options.getInteger('id');
+  const skippedActivity = await this.skipActivity(skipId);
+  if (skippedActivity) {
+    const memoText = skippedActivity.memo ? `\n備考: ${skippedActivity.memo}` : '';
+    await interaction.reply(`😅 やり逃してしまいました\n活動内容: ${skippedActivity.content}\nID: ${skippedActivity.id}${memoText}\n\n😅 今回は見送りましたね。また機会があればチャレンジしてみてください！`);
+  } else {
+    await interaction.reply('指定されたIDの活動が見つかりませんでした。');
+  }
+  break;
       
       case 'list':
         const activities = await this.getActivities();
