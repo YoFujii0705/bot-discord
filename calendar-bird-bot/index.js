@@ -982,104 +982,130 @@ class CalendarBird {
   }
 
   async sendDailyNotification() {
-    try {
-      console.log(`📬 カウントダウン通知準備中... (JST: ${this.formatJSTDate(new Date(), true)})`);
+  try {
+    console.log(`📬 カウントダウン通知準備中... (JST: ${this.formatJSTDate(new Date(), true)})`);
 
-      const now = new Date();
-      const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90日後まで（約3ヶ月）
 
-      const response = await this.calendar.events.list({
-        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-        timeMin: now.toISOString(),
-        timeMax: futureDate.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime'
-      });
+    const response = await this.calendar.events.list({
+      calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+      timeMin: now.toISOString(),
+      timeMax: futureDate.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime'
+    });
 
-      const events = response.data.items || [];
+    const events = response.data.items || [];
 
-      // カウントダウン対象の予定をフィルタリング（想定締切ロジック追加）
-      const countdownEvents = events.filter(event => {
-        const description = event.description || '';
-        
-        // カウントダウンがONでない場合は除外
-        if (!description.toLowerCase().includes('カウントダウン:on')) {
-          return false;
-        }
-
-        // 想定締切がある場合のチェック
-        const plannedMatch = description.match(/想定締切:(\d{4}-\d{2}-\d{2})/);
-        if (plannedMatch) {
-          const plannedDate = new Date(plannedMatch[1] + 'T23:59:59');
-          const plannedDaysLeft = this.calculateDaysLeft(plannedDate);
-          
-          // 想定締切を過ぎている場合は除外
-          if (plannedDaysLeft < 0) {
-            console.log(`⏭️ "${event.summary}" は想定締切(${plannedMatch[1]})を過ぎているため除外`);
-            return false;
-          }
-        }
-
-        return true;
-      });
-
-      if (countdownEvents.length === 0) {
-        console.log('📭 カウントダウン対象の予定がありません（想定締切を過ぎた予定は除外済み）');
-        return;
+    // カウントダウン対象の予定をフィルタリング（想定締切ロジック）
+    const countdownEvents = events.filter(event => {
+      const description = event.description || '';
+      
+      // カウントダウンがONでない場合は除外
+      if (!description.toLowerCase().includes('カウントダウン:on')) {
+        return false;
       }
 
-      const topEvents = countdownEvents.slice(0, 3);
+      // 想定締切がある場合のチェック
+      const plannedMatch = description.match(/想定締切:(\d{4}-\d{2}-\d{2})/);
+      if (plannedMatch) {
+        const plannedDate = new Date(plannedMatch[1] + 'T23:59:59');
+        const plannedDaysLeft = this.calculateDaysLeft(plannedDate);
+        
+        // 想定締切を過ぎている場合は除外
+        if (plannedDaysLeft < 0) {
+          console.log(`⏭️ "${event.summary}" は想定締切(${plannedMatch[1]})を過ぎているため除外`);
+          return false;
+        }
+      }
 
+      return true;
+    });
+
+    if (countdownEvents.length === 0) {
+      console.log('📭 カウントダウン対象の予定がありません（想定締切を過ぎた予定は除外済み）');
+      
+      // 予定がない場合も通知を送信（オプション）
       const embed = new EmbedBuilder()
         .setTitle('📅 本日のカウントダウン')
-        .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}`)
-        .setColor('#FFD700')
+        .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}\n\n📭 現在、カウントダウン対象の予定がありません。`)
+        .setColor('#808080')
         .setTimestamp();
-
-      topEvents.forEach(event => {
-        const startTime = new Date(event.start.dateTime || event.start.date);
-        const daysLeft = this.calculateDaysLeft(startTime);
-        const description = event.description || '';
-
-        const plannedMatch = description.match(/想定締切:(\d{4}-\d{2}-\d{2})/);
-        let plannedText = '';
-
-        if (plannedMatch) {
-          const plannedDate = new Date(plannedMatch[1] + 'T23:59:59');
-          const plannedDaysLeft = this.calculateDaysLeft(plannedDate);
-          
-          // 想定締切の表示ロジック改善
-          if (plannedDaysLeft >= 0) {
-            plannedText = `\n   └ 想定締切まで：あと${plannedDaysLeft}日`;
-          } else {
-            plannedText = `\n   └ 想定締切：${Math.abs(plannedDaysLeft)}日経過`;
-          }
-        }
-
-        let urgencyEmoji = '🟢';
-        if (daysLeft <= 1) urgencyEmoji = '🔴';
-        else if (daysLeft <= 3) urgencyEmoji = '🟡';
-        else if (daysLeft <= 7) urgencyEmoji = '🟠';
-
-        embed.addFields({
-          name: `${urgencyEmoji} ${event.summary}`,
-          value: `   └ 実際締切まで：あと${daysLeft}日${plannedText}`,
-          inline: false
-        });
-      });
 
       const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
       if (channel) {
         await channel.send({ embeds: [embed] });
-        console.log('✅ カウントダウン通知を送信しました');
-      } else {
-        console.error('❌ 通知チャンネルが見つかりません');
+        console.log('✅ カウントダウン通知（予定なし）を送信しました');
+      }
+      return;
+    }
+
+    // 直近の3件を取得
+    const topEvents = countdownEvents.slice(0, 3);
+
+    const embed = new EmbedBuilder()
+      .setTitle('📅 本日のカウントダウン')
+      .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}\n📊 カウントダウン対象: ${countdownEvents.length}件中、直近${topEvents.length}件を表示`)
+      .setColor('#FFD700')
+      .setTimestamp();
+
+    topEvents.forEach((event, index) => {
+      const startTime = new Date(event.start.dateTime || event.start.date);
+      const daysLeft = this.calculateDaysLeft(startTime);
+      const description = event.description || '';
+
+      // 想定締切の情報を取得
+      const plannedMatch = description.match(/想定締切:(\d{4}-\d{2}-\d{2})/);
+      let plannedText = '';
+
+      if (plannedMatch) {
+        const plannedDate = new Date(plannedMatch[1] + 'T23:59:59');
+        const plannedDaysLeft = this.calculateDaysLeft(plannedDate);
+        
+        if (plannedDaysLeft >= 0) {
+          plannedText = `\n   └ 想定締切まで：あと${plannedDaysLeft}日`;
+        } else {
+          // 想定締切を過ぎている場合（通常はフィルタで除外されるが念のため）
+          plannedText = `\n   └ 想定締切：${Math.abs(plannedDaysLeft)}日経過`;
+        }
       }
 
-    } catch (error) {
-      console.error('通知送信エラー:', error);
+      // 緊急度に応じたアイコン
+      let urgencyEmoji = '🟢';
+      if (daysLeft <= 1) urgencyEmoji = '🔴';
+      else if (daysLeft <= 3) urgencyEmoji = '🟡';
+      else if (daysLeft <= 7) urgencyEmoji = '🟠';
+
+      // 順位表示を追加
+      const rankEmoji = ['🥇', '🥈', '🥉'][index] || `${index + 1}.`;
+
+      embed.addFields({
+        name: `${rankEmoji} ${urgencyEmoji} ${event.summary}`,
+        value: `   └ 実際締切まで：あと${daysLeft}日${plannedText}`,
+        inline: false
+      });
+    });
+
+    // 4件以上ある場合の追加情報
+    if (countdownEvents.length > 3) {
+      embed.setFooter({ 
+        text: `他に${countdownEvents.length - 3}件のカウントダウン対象予定があります。詳細は /countdown list で確認してください。` 
+      });
     }
+
+    const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
+    if (channel) {
+      await channel.send({ embeds: [embed] });
+      console.log('✅ カウントダウン通知を送信しました');
+    } else {
+      console.error('❌ 通知チャンネルが見つかりません');
+    }
+
+  } catch (error) {
+    console.error('通知送信エラー:', error);
   }
+}
 
   async registerCommands() {
     const commands = [
