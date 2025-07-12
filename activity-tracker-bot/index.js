@@ -978,6 +978,13 @@ async addDailyReport(category, id, content) {
     }, {
       timezone: "Asia/Tokyo"
     });
+
+    // 毎日20時: ログ記録リマインド
+    cron.schedule('0 20 * * *', async () => {
+      await this.sendLogReminder();
+    }, {
+     timezone: "Asia/Tokyo"
+    });
     
     console.log('定期通知機能が有効になりました');
   }
@@ -1047,6 +1054,33 @@ async sendMorningReminder() {
     }
   } catch (error) {
     console.error('朝の通知エラー:', error);
+  }
+}
+
+async sendLogReminder() {
+  try {
+    const channel = this.getNotificationChannel();
+    if (channel) {
+      const embed = new EmbedBuilder()
+        .setTitle('📝 ログ記録のリマインド')
+        .setDescription('今日の活動を振り返って、日報を記録してみませんか？')
+        .addFields(
+          { name: '📚 本の記録', value: '`/report book [ID] [内容]`', inline: true },
+          { name: '🎬 映画の記録', value: '`/report movie [ID] [内容]`', inline: true },
+          { name: '🎯 活動の記録', value: '`/report activity [ID] [内容]`', inline: true },
+          { name: '💡 記録のコツ', value: '• 今日読んだページ数\n• 映画の感想\n• 活動の進捗や気づき', inline: false }
+        )
+        .setColor('#ff9800')
+        .setFooter({ text: '継続は力なり！今日も一歩前進しましょう 💪' })
+        .setTimestamp();
+      
+      await channel.send({ embeds: [embed] });
+      console.log('📝 ログリマインドを送信しました');
+    } else {
+      console.log('通知チャンネルが見つかりませんでした');
+    }
+  } catch (error) {
+    console.error('ログリマインド送信エラー:', error);
   }
 }
 
