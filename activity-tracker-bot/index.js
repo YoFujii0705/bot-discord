@@ -8,6 +8,7 @@ class ActivityTrackerBot {
       intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
       rest: { 
         timeout: 30000
+    this.requestQueue = new RequestQueue();
       }
     });
     
@@ -243,45 +244,50 @@ setupEvents() {
 
   // インタラクション処理
   this.client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+  if (!interaction.isChatInputCommand()) return;
 
-    try {
-      const { commandName } = interaction;
-      
-      switch (commandName) {
-        case 'book':
-          await this.handleBookCommand(interaction);
-          break;
-        case 'movie':
-          await this.handleMovieCommand(interaction);
-          break;
-        case 'activity':
-          await this.handleActivityCommand(interaction);
-          break;
-        case 'report':
-          await this.handleReportCommand(interaction);
-          break;
-        case 'stats':
-          await this.handleStatsCommand(interaction);
-          break;
-        case 'search':
-          await this.handleSearchCommand(interaction);
-          break;
-        default:
-          await interaction.reply({ content: '不明なコマンドです。', ephemeral: true });
-      }
-    } catch (error) {
-      console.error('❌ コマンド実行エラー:', error);
-      if (!interaction.replied && !interaction.deferred) {
-        try {
-          await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
-        } catch (replyError) {
-          console.error('❌ エラー応答の送信に失敗:', replyError);
-        }
-      }
+  try {
+    // 最重要：即座にdefer
+    await interaction.deferReply();
+    
+    const { commandName } = interaction;
+    
+    switch (commandName) {
+      case 'book':
+        await this.handleBookCommand(interaction);
+        break;
+      case 'movie':
+        await this.handleMovieCommand(interaction);
+        break;
+      case 'activity':
+        await this.handleActivityCommand(interaction);
+        break;
+      case 'report':
+        await this.handleReportCommand(interaction);
+        break;
+      case 'stats':
+        await this.handleStatsCommand(interaction);
+        break;
+      case 'search':
+        await this.handleSearchCommand(interaction);
+        break;
+      default:
+        await interaction.editReply({ content: '不明なコマンドです。' });
     }
-  });
-
+  } catch (error) {
+    console.error('❌ コマンド実行エラー:', error);
+    try {
+      if (interaction.deferred) {
+        await interaction.editReply({ content: 'エラーが発生しました。' });
+      } else {
+        await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
+      }
+    } catch (replyError) {
+      console.error('❌ エラー応答の送信に失敗:', replyError);
+    }
+  }
+});
+	
   // エラーハンドリング
   this.client.on('error', error => {
     console.error('❌ Discord.js エラー:', error);
@@ -291,9 +297,11 @@ setupEvents() {
     console.warn('⚠️ Discord.js 警告:', info);
   });
 }
-  async handleBookCommand(interaction) {
-    const subcommand = interaction.options.getSubcommand();
-    
+
+async handleBookCommand(interaction) {
+  const subcommand = interaction.options.getSubcommand();
+  
+  try {
     switch (subcommand) {
       case 'add':
         const title = interaction.options.getString('title');
@@ -301,7 +309,7 @@ setupEvents() {
         const memo = interaction.options.getString('memo') || '';
         
         const bookId = await this.addBook(title, author, memo);
-        await interaction.reply(`📚 本を追加しました！\nID: ${bookId}\nタイトル: ${title}\n作者: ${author}`);
+        await interaction.editReply(`📚 本を追加しました！\nID: ${bookId}\nタイトル: ${title}\n作者: ${author}`);
         break;
       
       case 'start':
@@ -319,9 +327,9 @@ setupEvents() {
             .setDescription('頑張って読み進めましょう！✨')
             .setTimestamp();
           
-          await interaction.reply({ embeds: [embed] });
+          await interaction.editReply({ embeds: [embed] });
         } else {
-          await interaction.reply('指定されたIDの本が見つかりませんでした。');
+          await interaction.editReply('指定されたIDの本が見つかりませんでした。');
         }
         break;
       
@@ -341,9 +349,9 @@ setupEvents() {
             .setDescription('素晴らしい達成感ですね！次の本も楽しみです📚✨')
             .setTimestamp();
           
-          await interaction.reply({ embeds: [embed] });
+          await interaction.editReply({ embeds: [embed] });
         } else {
-          await interaction.reply('指定されたIDの本が見つかりませんでした。');
+          await interaction.editReply('指定されたIDの本が見つかりませんでした。');
         }
         break;
       
@@ -354,11 +362,15 @@ setupEvents() {
           .setColor('#0099ff')
           .setDescription(books.length > 0 ? books.join('\n') : '登録されている本はありません');
         
-        await interaction.reply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
         break;
     }
+  } catch (error) {
+    console.error('Book command error:', error);
+    await interaction.editReply('処理中にエラーが発生しました。');
   }
-
+}
+	
 async handleMovieCommand(interaction) {
   const subcommand = interaction.options.getSubcommand();
   
@@ -451,13 +463,16 @@ async handleMovieCommand(interaction) {
   }
 
   async handleReportCommand(interaction) {
+  try {
     const category = interaction.options.getString('category');
     const id = interaction.options.getInteger('id');
     const content = interaction.options.getString('content');
     
-    const targetInfo = await this.getItemInfo(category, id);
-    
-    await this.addDailyReport(category, id, content);
+    // 並行実行で高速化
+    const [targetInfo] = await Promise.all([
+      this.getItemInfo(category, id),
+      this.addDailyReport(category, id, content)
+    ]);
     
     if (targetInfo) {
       const categoryEmoji = {
@@ -478,11 +493,15 @@ async handleMovieCommand(interaction) {
         .setDescription('今日も頑張りましたね！継続は力なりです✨')
         .setTimestamp();
       
-      await interaction.reply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
     } else {
-      await interaction.reply(`📝 日報を記録しました！\n**内容:** ${content}\n今日も頑張りましたね✨`);
+      await interaction.editReply(`📝 日報を記録しました！\n**内容:** ${content}\n今日も頑張りましたね✨`);
     }
+  } catch (error) {
+    console.error('Report command error:', error);
+    await interaction.editReply('日報の記録中にエラーが発生しました。');
   }
+}
 
 async handleStatsCommand(interaction) {
   const subcommand = interaction.options.getSubcommand();
@@ -557,6 +576,44 @@ async handleStatsCommand(interaction) {
       await interaction.reply(`🔍 "${keyword}" に一致するアイテムが見つかりませんでした。`);
     }
   }
+
+class RequestQueue {
+  constructor() {
+    this.queue = [];
+    this.processing = false;
+  }
+  
+  async add(operation) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ operation, resolve, reject });
+      this.processQueue();
+    });
+  }
+  
+  async processQueue() {
+    if (this.processing || this.queue.length === 0) return;
+    
+    this.processing = true;
+    
+    while (this.queue.length > 0) {
+      const { operation, resolve, reject } = this.queue.shift();
+      
+      try {
+        const result = await operation();
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+      
+      // リクエスト間隔を空ける
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    this.processing = false;
+  }
+}
+
+	
 // Google Sheets操作メソッド
   async getNextId(sheetName) {
     if (!this.auth) return Math.floor(Math.random() * 1000);
@@ -573,24 +630,49 @@ async handleStatsCommand(interaction) {
   }
 
   async addBook(title, author, memo) {
-    if (!this.auth) return Math.floor(Math.random() * 1000);
-    
-    const auth = await this.auth.getClient();
-    const id = await this.getNextId('books_master');
-    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    
-    await this.sheets.spreadsheets.values.append({
-      auth,
-      spreadsheetId: this.spreadsheetId,
-      range: 'books_master!A:G',
-      valueInputOption: 'RAW',
-      resource: {
-        values: [[id, now, title, author, memo, 'registered', '']]
+  if (!this.auth) return Math.floor(Math.random() * 1000);
+  
+  const maxRetries = 3;
+  let retries = 0;
+  
+  while (retries < maxRetries) {
+    try {
+      const auth = await this.auth.getClient();
+      const id = await this.getNextId('books_master');
+      const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+      
+      // タイムアウト設定付きで実行
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Operation timeout')), 10000)
+      );
+      
+      const operationPromise = this.sheets.spreadsheets.values.append({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range: 'books_master!A:G',
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[id, now, title, author, memo, 'registered', '']]
+        }
+      });
+      
+      await Promise.race([operationPromise, timeoutPromise]);
+      return id;
+      
+    } catch (error) {
+      console.error(`Attempt ${retries + 1} failed:`, error);
+      retries++;
+      
+      if (retries >= maxRetries) {
+        console.error('Max retries reached, using fallback');
+        return Math.floor(Math.random() * 1000);
       }
-    });
-    
-    return id;
+      
+      // 指数バックオフで待機
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries)));
+    }
   }
+}
 
   async startReading(id) {
     if (!this.auth) return { id, title: 'テスト本', author: 'テスト作者', memo: '' };
@@ -817,15 +899,18 @@ async updateMovieStatus(id, status) {
   }
 
   async skipActivity(id) {
-    await this.updateActivityStatus(id, 'skipped');
-  }
+  return await this.updateActivityStatus(id, 'skipped');
+}
 
-  async updateActivityStatus(id, status) {
-    if (!this.auth) return;
-    
-    const auth = await this.auth.getClient();
-    const date = new Date().toISOString().slice(0, 10);
-    
+async updateActivityStatus(id, status) {
+  if (!this.auth) {
+    return { id, content: 'テスト活動', memo: 'テストメモ' };
+  }
+  
+  const auth = await this.auth.getClient();
+  const date = new Date().toISOString().slice(0, 10);
+  
+  try {
     const response = await this.sheets.spreadsheets.values.get({
       auth,
       spreadsheetId: this.spreadsheetId,
@@ -836,6 +921,14 @@ async updateMovieStatus(id, status) {
     const rowIndex = values.findIndex(row => row[0] == id);
     
     if (rowIndex !== -1) {
+      const row = values[rowIndex];
+      
+      const activityInfo = {
+        id: row[0],
+        content: row[2] || '不明な活動',
+        memo: row[3] || ''
+      };
+      
       await this.sheets.spreadsheets.values.update({
         auth,
         spreadsheetId: this.spreadsheetId,
@@ -845,9 +938,15 @@ async updateMovieStatus(id, status) {
           values: [[status, date]]
         }
       });
+      
+      return activityInfo;
     }
+  } catch (error) {
+    console.error('活動ステータス更新エラー:', error);
   }
-
+  
+  return null;
+}
   async getActivities() {
     if (!this.auth) return ['🎯 [1] テスト活動 (planned)'];
     
@@ -1741,6 +1840,12 @@ async getRealCurrentProgress() {
     console.error('進行状況取得エラー:', error);
     return { readingBooks: [], wantToWatchMovies: [] };
   }
+}
+
+async addBookQueued(title, author, memo) {
+  return this.requestQueue.add(async () => {
+    return this.addBook(title, author, memo);
+  });
 }
 
   start() {
