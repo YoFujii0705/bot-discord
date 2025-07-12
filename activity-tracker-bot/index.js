@@ -248,6 +248,38 @@ class ActivityTrackerBot {
 
     commands.push(searchCommand);
 
+    const reportSearchCommand = new SlashCommandBuilder()
+  .setName('reports')
+  .setDescription('レポート履歴を検索・表示')
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('history')
+      .setDescription('特定の作品・活動のレポート履歴を表示')
+      .addStringOption(option =>
+        option.setName('category').setDescription('カテゴリ').setRequired(true)
+          .addChoices(
+            { name: '本', value: 'book' },
+            { name: '映画', value: 'movie' },
+            { name: '活動', value: 'activity' }
+          ))
+      .addIntegerOption(option =>
+        option.setName('id').setDescription('対象のID').setRequired(true)))
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('recent')
+      .setDescription('最近のレポート一覧を表示')
+      .addIntegerOption(option =>
+        option.setName('days').setDescription('何日前まで表示するか（デフォルト: 7日）').setRequired(false)))
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('search')
+      .setDescription('レポート内容でキーワード検索')
+      .addStringOption(option =>
+        option.setName('keyword').setDescription('検索キーワード').setRequired(true)));
+
+commands.push(reportSearchCommand);
+
+
     console.log('定義されたコマンド:', commands.map(cmd => cmd.name));
     return commands;
   }
@@ -305,6 +337,9 @@ class ActivityTrackerBot {
           case 'search':
             await this.handleSearchCommand(interaction);
             break;
+          case 'reports':
+  　　　　　await this.handleReportsCommand(interaction);
+ 　　　　　 break;
           default:
             await interaction.editReply({ content: '不明なコマンドです。' });
         }
@@ -569,6 +604,208 @@ async handleReportCommand(interaction) {
     } catch (replyError) {
       console.error('❌ 最終応答エラー:', replyError);
     }
+  }
+}
+
+async handleReportsCommand(interaction) {
+  const subcommand = interaction.options.getSubcommand();
+  
+  try {
+    switch (subcommand) {
+      case 'history':
+        await this.handleReportHistory(interaction);
+        break;
+      case 'recent':
+        await this.handleRecentReports(interaction);
+        break;
+      case 'search':
+        await this.handleReportSearch(interaction);
+        break;
+      default:
+        await interaction.editReply('不明なサブコマンドです。');
+    }
+  } catch (error) {
+    console.error('Reports command error:', error);
+    await interaction.editReply('レポート検索中にエラーが発生しました。');
+  }
+}
+
+  async handleReportHistory(interaction) {
+  try {
+    const category = interaction.options.getString('category');
+    const id = interaction.options.getInteger('id');
+    
+    console.log('=== レポート履歴検索開始 ===', { category, id });
+    
+    // 並行で作品情報とレポート履歴を取得
+    const [itemInfo, reports] = await Promise.all([
+      this.getItemInfo(category, id),
+      this.getReportsByItem(category, id)
+    ]);
+    
+    if (!itemInfo) {
+      await interaction.editReply(`指定された${category === 'book' ? '本' : category === 'movie' ? '映画' : '活動'}（ID: ${id}）が見つかりませんでした。`);
+      return;
+    }
+    
+    const categoryEmoji = {
+      'book': '📚',
+      'movie': '🎬',
+      'activity': '🎯'
+    };
+    
+    const categoryName = {
+      'book': '本',
+      'movie': '映画',
+      'activity': '活動'
+    };
+    
+    if (reports.length === 0) {
+      await interaction.editReply(
+        `${categoryEmoji[category]} **${itemInfo.title || itemInfo.content}のレポート履歴**\n\n` +
+        `📝 まだレポートが記録されていません。\n` +
+        `\`/report ${category} ${id} [内容]\` でレポートを記録してみましょう！`
+      );
+      return;
+    }
+    
+    // レポートを日付順に並び替え（新しい順）
+    reports.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    let response = `${categoryEmoji[category]} **${itemInfo.title || itemInfo.content}のレポート履歴**\n\n`;
+    
+    if (category === 'book' && itemInfo.author) {
+      response += `👤 **作者:** ${itemInfo.author}\n\n`;
+    }
+    
+    response += `📊 **総レポート数:** ${reports.length}件\n\n`;
+    response += `📝 **レポート履歴:**\n`;
+    
+    // 最大10件まで表示
+    const displayReports = reports.slice(0, 10);
+    
+    for (const report of displayReports) {
+      const date = new Date(report.date).toLocaleDateString('ja-JP');
+      response += `\n📅 **${date}**\n`;
+      response += `${report.content}\n`;
+      response += `${'─'.repeat(30)}\n`;
+    }
+    
+    if (reports.length > 10) {
+      response += `\n💡 他${reports.length - 10}件のレポートがあります`;
+    }
+    
+    // 文字数制限対応（Discord は2000文字まで）
+    if (response.length > 1900) {
+      response = response.substring(0, 1900) + '\n...\n📝 レポートが多すぎるため一部省略されました';
+    }
+    
+    await interaction.editReply(response);
+    
+  } catch (error) {
+    console.error('レポート履歴取得エラー:', error);
+    await interaction.editReply('レポート履歴の取得中にエラーが発生しました。');
+  }
+}
+
+// 5. 最近のレポート一覧を表示
+async handleRecentReports(interaction) {
+  try {
+    const days = interaction.options.getInteger('days') || 7;
+    const reports = await this.getRecentReports(days);
+    
+    if (reports.length === 0) {
+      await interaction.editReply(`📝 過去${days}日間のレポートはありません。`);
+      return;
+    }
+    
+    let response = `📝 **過去${days}日間のレポート一覧**\n\n`;
+    response += `📊 **総数:** ${reports.length}件\n\n`;
+    
+    // カテゴリごとにグループ化
+    const groupedReports = {
+      book: reports.filter(r => r.category === 'book'),
+      movie: reports.filter(r => r.category === 'movie'),
+      activity: reports.filter(r => r.category === 'activity')
+    };
+    
+    const categoryEmoji = { book: '📚', movie: '🎬', activity: '🎯' };
+    const categoryName = { book: '本', movie: '映画', activity: '活動' };
+    
+    for (const [category, categoryReports] of Object.entries(groupedReports)) {
+      if (categoryReports.length > 0) {
+        response += `${categoryEmoji[category]} **${categoryName[category]}** (${categoryReports.length}件)\n`;
+        
+        // 最新5件まで表示
+        const recentReports = categoryReports.slice(0, 5);
+        for (const report of recentReports) {
+          const date = new Date(report.date).toLocaleDateString('ja-JP');
+          const shortContent = report.content.length > 50 ? 
+            report.content.substring(0, 50) + '...' : report.content;
+          response += `  • ${date} - ID:${report.itemId} - ${shortContent}\n`;
+        }
+        
+        if (categoryReports.length > 5) {
+          response += `  📝 他${categoryReports.length - 5}件\n`;
+        }
+        response += '\n';
+      }
+    }
+    
+    response += `💡 詳細を見るには \`/reports history\` を使用してください`;
+    
+    await interaction.editReply(response);
+    
+  } catch (error) {
+    console.error('最近のレポート取得エラー:', error);
+    await interaction.editReply('最近のレポート取得中にエラーが発生しました。');
+  }
+}
+
+// 6. レポート内容でキーワード検索
+async handleReportSearch(interaction) {
+  try {
+    const keyword = interaction.options.getString('keyword');
+    const reports = await this.searchReportsByKeyword(keyword);
+    
+    if (reports.length === 0) {
+      await interaction.editReply(`🔍 "${keyword}" に一致するレポートが見つかりませんでした。`);
+      return;
+    }
+    
+    let response = `🔍 **"${keyword}" の検索結果**\n\n`;
+    response += `📊 **見つかった件数:** ${reports.length}件\n\n`;
+    
+    const categoryEmoji = { book: '📚', movie: '🎬', activity: '🎯' };
+    
+    // 最大10件まで表示
+    const displayReports = reports.slice(0, 10);
+    
+    for (const report of displayReports) {
+      const date = new Date(report.date).toLocaleDateString('ja-JP');
+      const emoji = categoryEmoji[report.category];
+      
+      response += `${emoji} **ID:${report.itemId}** (${date})\n`;
+      
+      // キーワードをハイライト（**で囲む）
+      const highlightedContent = report.content.replace(
+        new RegExp(keyword, 'gi'), 
+        `**${keyword}**`
+      );
+      
+      response += `${highlightedContent}\n`;
+      response += `${'─'.repeat(25)}\n\n`;
+    }
+    
+    if (reports.length > 10) {
+      response += `💡 他${reports.length - 10}件の結果があります`;
+    }
+    
+    await interaction.editReply(response);
+    
+  } catch (error) {
+    console.error('レポートキーワード検索エラー:', error);
+    await interaction.editReply('レポート検索中にエラーが発生しました。');
   }
 }
 
@@ -1376,6 +1613,249 @@ async addDailyReport(category, id, content) {
       return this.addActivity(content, memo);
     });
   }
+
+  // レポートデータ取得メソッド群
+
+// 1. 特定アイテムのレポート履歴を取得
+async getReportsByItem(category, itemId) {
+  if (!this.auth) {
+    // テストデータ
+    return [
+      {
+        date: '2024-01-15',
+        content: `テスト${category}のレポート1`,
+        category: category,
+        itemId: itemId
+      },
+      {
+        date: '2024-01-14',
+        content: `テスト${category}のレポート2`,
+        category: category,
+        itemId: itemId
+      }
+    ];
+  }
+  
+  try {
+    const auth = await this.auth.getClient();
+    
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Operation timeout')), 8000)
+    );
+    
+    const operationPromise = this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'daily_reports!A:E'
+    });
+    
+    const response = await Promise.race([operationPromise, timeoutPromise]);
+    const values = response.data.values || [];
+    
+    // ヘッダーを除いて、指定されたカテゴリとIDに一致するレポートをフィルタ
+    const reports = values.slice(1)
+      .filter(row => 
+        row[2] === category && // カテゴリが一致
+        row[3] == itemId       // IDが一致
+      )
+      .map(row => ({
+        reportId: row[0],
+        date: row[1],
+        category: row[2],
+        itemId: row[3],
+        content: row[4] || ''
+      }));
+    
+    console.log(`${category} ID:${itemId} のレポート取得完了:`, reports.length, '件');
+    return reports;
+    
+  } catch (error) {
+    console.error('レポート履歴取得エラー:', error);
+    return [];
+  }
+}
+
+// 2. 最近のレポート一覧を取得
+async getRecentReports(days = 7) {
+  if (!this.auth) {
+    // テストデータ
+    return [
+      {
+        date: new Date().toISOString().slice(0, 10),
+        content: 'テスト本のレポート',
+        category: 'book',
+        itemId: 1
+      },
+      {
+        date: new Date().toISOString().slice(0, 10),
+        content: 'テスト映画のレポート',
+        category: 'movie',
+        itemId: 1
+      }
+    ];
+  }
+  
+  try {
+    const auth = await this.auth.getClient();
+    
+    // N日前の日付を計算
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() - days);
+    const targetDateStr = targetDate.toISOString().slice(0, 10);
+    
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Operation timeout')), 8000)
+    );
+    
+    const operationPromise = this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'daily_reports!A:E'
+    });
+    
+    const response = await Promise.race([operationPromise, timeoutPromise]);
+    const values = response.data.values || [];
+    
+    // 指定期間内のレポートをフィルタして日付順に並び替え
+    const reports = values.slice(1)
+      .filter(row => row[1] >= targetDateStr) // 指定日以降
+      .map(row => ({
+        reportId: row[0],
+        date: row[1],
+        category: row[2],
+        itemId: row[3],
+        content: row[4] || ''
+      }))
+      .sort((a, b) => new Date(b.date) - new Date(a.date)); // 新しい順
+    
+    console.log(`過去${days}日間のレポート取得完了:`, reports.length, '件');
+    return reports;
+    
+  } catch (error) {
+    console.error('最近のレポート取得エラー:', error);
+    return [];
+  }
+}
+
+// 3. キーワードでレポート検索
+async searchReportsByKeyword(keyword) {
+  if (!this.auth) {
+    // テストデータ
+    return [
+      {
+        date: new Date().toISOString().slice(0, 10),
+        content: `${keyword}を含むテストレポート`,
+        category: 'book',
+        itemId: 1
+      }
+    ];
+  }
+  
+  try {
+    const auth = await this.auth.getClient();
+    
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Operation timeout')), 8000)
+    );
+    
+    const operationPromise = this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'daily_reports!A:E'
+    });
+    
+    const response = await Promise.race([operationPromise, timeoutPromise]);
+    const values = response.data.values || [];
+    
+    // キーワードでレポート内容を検索
+    const reports = values.slice(1)
+      .filter(row => {
+        const content = (row[4] || '').toLowerCase();
+        return content.includes(keyword.toLowerCase());
+      })
+      .map(row => ({
+        reportId: row[0],
+        date: row[1],
+        category: row[2],
+        itemId: row[3],
+        content: row[4] || ''
+      }))
+      .sort((a, b) => new Date(b.date) - new Date(a.date)); // 新しい順
+    
+    console.log(`"${keyword}" の検索結果:`, reports.length, '件');
+    return reports;
+    
+  } catch (error) {
+    console.error('レポートキーワード検索エラー:', error);
+    return [];
+  }
+}
+
+// 4. 改良版getItemInfo（エラーハンドリング強化）
+async getItemInfo(category, id) {
+  if (!this.auth) return { title: `テスト${category}` };
+  
+  let range, titleColumn, contentColumn;
+  
+  switch (category) {
+    case 'book':
+      range = 'books_master!A:G';
+      titleColumn = 2;
+      contentColumn = 3;
+      break;
+    case 'movie':
+      range = 'movies_master!A:F';
+      titleColumn = 2;
+      break;
+    case 'activity':
+      range = 'activities_master!A:F';
+      contentColumn = 2;
+      break;
+    default:
+      return null;
+  }
+  
+  try {
+    const auth = await this.auth.getClient();
+    
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Operation timeout')), 5000)
+    );
+    
+    const operationPromise = this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range
+    });
+    
+    const response = await Promise.race([operationPromise, timeoutPromise]);
+    const values = response.data.values || [];
+    const row = values.find(row => row[0] == id);
+    
+    if (row) {
+      if (category === 'book') {
+        return {
+          title: row[titleColumn] || '不明なタイトル',
+          author: row[contentColumn] || '不明な作者'
+        };
+      } else if (category === 'movie') {
+        return {
+          title: row[titleColumn] || '不明なタイトル'
+        };
+      } else if (category === 'activity') {
+        return {
+          content: row[contentColumn] || '不明な活動'
+        };
+      }
+    }
+    
+    return null;
+    
+  } catch (error) {
+    console.error('アイテム情報取得エラー:', error);
+    return null;
+  }
+}
 
 // Part 5: 統計・検索・通知機能（最終部分）
 
