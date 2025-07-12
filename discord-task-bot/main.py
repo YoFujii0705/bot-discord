@@ -497,43 +497,68 @@ async def daily_reminder():
         if len(all_values) <= 1:
             return
 
-        user_task_count = {}
+        # ユーザーごとのタスク情報を収集
+        user_tasks = {}
 
         for row in all_values[1:]:
-            if len(row) >= 6 and row[2] != 'TRUE':
+            if len(row) >= 6 and row[2] != 'TRUE':  # 未完了タスクのみ
                 user_name = row[5]
-                user_task_count[user_name] = user_task_count.get(user_name, 0) + 1
+                task_name = row[0]
+                created_date = row[1]
+                
+                if user_name not in user_tasks:
+                    user_tasks[user_name] = []
+                
+                user_tasks[user_name].append({
+                    'name': task_name,
+                    'created': created_date
+                })
 
-        if not user_task_count:
+        if not user_tasks:
             embed = discord.Embed(
                 title="🌅 おはようございます！",
-                description="現在、未完了のタスクはありません！",
+                description="現在、未完了のタスクはありません！\n今日も素晴らしい一日を！",
                 color=0x00ff00
             )
             await channel.send(embed=embed)
             return
 
+        # メイン通知メッセージ
         embed = discord.Embed(
             title="🌅 おはようございます！",
             description="今日のタスク状況をお知らせします",
             color=0xff9500
         )
 
-        reminder_text = ""
-        for user_name, count in user_task_count.items():
-            reminder_text += f"📝 **{user_name}さん**: {count}件\n"
+        # ユーザーごとにタスクを表示（上位5件まで）
+        for user_name, tasks in user_tasks.items():
+            task_count = len(tasks)
+            
+            # タスクリストを作成（最大5件）
+            task_list = ""
+            for i, task in enumerate(tasks[:5]):  # 上から5つまで
+                task_list += f"• {task['name']}\n"
+            
+            # 5件を超える場合は「他○件」を追加
+            if task_count > 5:
+                task_list += f"• ... 他{task_count - 5}件\n"
+            
+            # フィールドに追加
+            field_title = f"📝 {user_name}さん ({task_count}件)"
+            embed.add_field(
+                name=field_title,
+                value=task_list if task_list else "タスクなし",
+                inline=False
+            )
 
+        # フッターにコマンド案内を追加
         embed.add_field(
-            name="未完了タスク",
-            value=reminder_text,
+            name="📱 便利なコマンド",
+            value="`!tasks` - 自分のタスク確認\n`!alltasks` - 全体状況\n`!complete [番号]` - タスク完了",
             inline=False
         )
 
-        embed.add_field(
-            name="📱 コマンド",
-            value="`!tasks` - 自分のタスク確認\n`!alltasks` - 全体状況",
-            inline=False
-        )
+        embed.set_footer(text="今日も頑張りましょう！💪")
 
         await channel.send(embed=embed)
         print("📢 毎日通知を送信しました")
