@@ -847,139 +847,135 @@ class CalendarBird {
   }
 
   async sendWeeklySchedule() {
-    try {
-      console.log(`📅 週間予定通知準備中... (JST: ${this.formatJSTDate(new Date(), true)})`);
+  try {
+    console.log(`📅 週間予定通知準備中... (JST: ${this.formatJSTDate(new Date(), true)})`);
 
-      const now = new Date();
-      const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-      const response = await this.calendar.events.list({
-        calendarId: CONFIG.GOOGLE_CALENDAR_ID,
-        timeMin: now.toISOString(),
-        timeMax: oneWeekLater.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime'
-      });
+    const response = await this.calendar.events.list({
+      calendarId: CONFIG.GOOGLE_CALENDAR_ID,
+      timeMin: now.toISOString(),
+      timeMax: oneWeekLater.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime'
+    });
 
-      const events = response.data.items || [];
+    const events = response.data.items || [];
 
-      if (events.length === 0) {
-        const embed = new EmbedBuilder()
-          .setTitle('📅 今週の予定')
-          .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}\n\n📭 今後一週間の予定がありません。`)
-          .setColor('#808080')
-          .setTimestamp();
-
-        const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
-        if (channel) {
-          await channel.send({ embeds: [embed] });
-          console.log('✅ 週間予定通知（予定なし）を送信しました');
-        }
-        return;
-      }
-
-      // 日付別にグループ化
-      const eventsByDate = {};
-      events.forEach(event => {
-        const startTime = new Date(event.start.dateTime || event.start.date);
-        const dateKey = this.formatJSTDateOnly(startTime);
-
-        if (!eventsByDate[dateKey]) {
-          eventsByDate[dateKey] = [];
-        }
-        eventsByDate[dateKey].push(event);
-      });
-
+    if (events.length === 0) {
       const embed = new EmbedBuilder()
-        .setTitle('📅 今週の予定一覧')
-        .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}\n📊 全${events.length}件の予定`)
-        .setColor('#4169E1')
+        .setTitle('📅 今週の予定')
+        .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}\n\n📭 今後一週間の予定がありません。`)
+        .setColor('#808080')
         .setTimestamp();
-
-      // 日付順に表示
-      const sortedDates = Object.keys(eventsByDate).sort();
-      let totalDisplayed = 0;
-      // 🔥 制限を完全に撤廃する場合
-      // const maxEventsPerDay = 25;
-      // const maxTotalEvents = 50;
-
-      for (const date of sortedDates) {
-        // 🔥 制限チェックをコメントアウト
-        // if (totalDisplayed >= maxTotalEvents) break;
-
-        const dayEvents = eventsByDate[date];
-        // 🔥 全ての予定を表示
-        const displayEvents = dayEvents; // .slice(0, maxEventsPerDay) を削除
-
-        // 🔥 曜日取得を修正
-        let dayOfWeek;
-        try {
-          // YYYY/MM/DD形式の日付をYYYY-MM-DD形式に変換
-          const normalizedDate = date.replace(/\//g, '-');
-          const dateObj = new Date(normalizedDate + 'T12:00:00'); // 正午を指定してタイムゾーンの問題を回避
-          
-          dayOfWeek = dateObj.toLocaleDateString('ja-JP', { 
-            weekday: 'short',
-            timeZone: 'Asia/Tokyo'
-          });
-          
-          console.log(`📅 日付変換: ${date} → ${normalizedDate} → 曜日: ${dayOfWeek}`);
-        } catch (error) {
-          console.error(`❌ 曜日取得エラー (${date}):`, error);
-          dayOfWeek = '?';
-        }
-
-        let dayText = '';
-        displayEvents.forEach(event => {
-          if (totalDisplayed >= maxTotalEvents) return;
-
-          const description = event.description || '';
-          const isCountdownOn = description.toLowerCase().includes('カウントダウン:on');
-          const status = isCountdownOn ? '🟢' : '⚪';
-
-          let timeDisplay;
-          if (event.start.dateTime) {
-            // 時刻指定の予定
-            const startTime = new Date(event.start.dateTime);
-            const timeStr = this.formatJSTDate(startTime).split(' ')[1]; // 時刻部分のみ
-            timeDisplay = `${timeStr}`;
-          } else {
-            // 終日予定
-            timeDisplay = '終日';
-          }
-
-          dayText += `${status} ${timeDisplay} ${event.summary}\n`;
-          totalDisplayed++;
-        });
-
-        if (dayEvents.length > maxEventsPerDay) {
-          dayText += `... 他${dayEvents.length - maxEventsPerDay}件\n`;
-        }
-
-        embed.addFields({
-          name: `📆 ${date} (${dayOfWeek})`,
-          value: dayText || '予定なし',
-          inline: false
-        });
-      }
-
-      // 🔥 制限表示を削除
-      // if (events.length > maxTotalEvents) {
-      //   embed.setFooter({ text: `※ 表示制限により、${maxTotalEvents}件まで表示。詳細は /countdown list で確認してください。` });
-      // }
 
       const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
       if (channel) {
         await channel.send({ embeds: [embed] });
-        console.log('✅ 週間予定通知を送信しました');
-      } else {
-        console.error('❌ 通知チャンネルが見つかりません');
+        console.log('✅ 週間予定通知（予定なし）を送信しました');
+      }
+      return;
+    }
+
+    // 日付別にグループ化
+    const eventsByDate = {};
+    events.forEach(event => {
+      const startTime = new Date(event.start.dateTime || event.start.date);
+      const dateKey = this.formatJSTDateOnly(startTime);
+
+      if (!eventsByDate[dateKey]) {
+        eventsByDate[dateKey] = [];
+      }
+      eventsByDate[dateKey].push(event);
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle('📅 今週の予定一覧')
+      .setDescription(`🕐 日本時間: ${this.formatJSTDate(new Date(), true)}\n📊 全${events.length}件の予定`)
+      .setColor('#4169E1')
+      .setTimestamp();
+
+    // 日付順に表示
+    const sortedDates = Object.keys(eventsByDate).sort();
+    let totalDisplayed = 0;
+    const maxEventsPerDay = 25;
+    const maxTotalEvents = 50;
+
+    for (const date of sortedDates) {
+      if (totalDisplayed >= maxTotalEvents) break;
+
+      const dayEvents = eventsByDate[date];
+      const displayEvents = dayEvents.slice(0, maxEventsPerDay);
+
+      // 曜日取得を修正
+      let dayOfWeek;
+      try {
+        // YYYY/MM/DD形式の日付をYYYY-MM-DD形式に変換
+        const normalizedDate = date.replace(/\//g, '-');
+        const dateObj = new Date(normalizedDate + 'T12:00:00'); // 正午を指定してタイムゾーンの問題を回避
+        
+        dayOfWeek = dateObj.toLocaleDateString('ja-JP', { 
+          weekday: 'short',
+          timeZone: 'Asia/Tokyo'
+        });
+        
+        console.log(`📅 日付変換: ${date} → ${normalizedDate} → 曜日: ${dayOfWeek}`);
+      } catch (error) {
+        console.error(`❌ 曜日取得エラー (${date}):`, error);
+        dayOfWeek = '?';
       }
 
-    } catch (error) {
-      console.error('週間予定通知送信エラー:', error);
+      let dayText = '';
+      displayEvents.forEach(event => {
+        if (totalDisplayed >= maxTotalEvents) return;
+
+        const description = event.description || '';
+        const isCountdownOn = description.toLowerCase().includes('カウントダウン:on');
+        const status = isCountdownOn ? '🟢' : '⚪';
+
+        let timeDisplay;
+        if (event.start.dateTime) {
+          // 時刻指定の予定
+          const startTime = new Date(event.start.dateTime);
+          const timeStr = this.formatJSTDate(startTime).split(' ')[1]; // 時刻部分のみ
+          timeDisplay = `${timeStr}`;
+        } else {
+          // 終日予定
+          timeDisplay = '終日';
+        }
+
+        dayText += `${status} ${timeDisplay} ${event.summary}\n`;
+        totalDisplayed++;
+      });
+
+      if (dayEvents.length > maxEventsPerDay) {
+        dayText += `... 他${dayEvents.length - maxEventsPerDay}件\n`;
+      }
+
+      embed.addFields({
+        name: `📆 ${date} (${dayOfWeek})`,
+        value: dayText || '予定なし',
+        inline: false
+      });
     }
+
+    if (events.length > maxTotalEvents) {
+      embed.setFooter({ text: `※ 表示制限により、${maxTotalEvents}件まで表示。詳細は /countdown list で確認してください。` });
+    }
+
+    const channel = this.client.channels.cache.get(CONFIG.NOTIFICATION_CHANNEL_ID);
+    if (channel) {
+      await channel.send({ embeds: [embed] });
+      console.log('✅ 週間予定通知を送信しました');
+    } else {
+      console.error('❌ 通知チャンネルが見つかりません');
+    }
+
+  } catch (error) {
+    console.error('週間予定通知送信エラー:', error);
   }
+}
 
   async sendDailyNotification() {
   try {
