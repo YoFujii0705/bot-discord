@@ -514,8 +514,13 @@ commands.push(reportSearchCommand);
         
         case 'done':
           const doneId = interaction.options.getInteger('id');
-          await this.doneActivity(doneId);
-          await interaction.editReply(`✅ 活動を完了しました！お疲れ様でした！🎉`);
+          const doneActivity = await this.doneActivity(doneId);
+          if (doneActivity){
+          const memoText = doneActivity.memo  ? `\n備考: ${doneActivity.memo}` : '';
+          await interaction.editReply(`🎉 行動完了！\n活動内容: ${doneActivity.title}\nID: ${doneActivity.id}${memoText}\n\n✅ 活動を完了しました！お疲れ様でした！🎉✨`);
+          } else {
+            await interaction.editReply('指定されたIDの活動が見つかりませんでした。');
+          }
           break;
         
         case 'skip':
