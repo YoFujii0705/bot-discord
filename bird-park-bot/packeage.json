@@ -1,1 +1,29 @@
-
+{
+  "name": "bird-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for bird gacha and virtual bird zoo",
+  "main": "src/bot.js",
+  "scripts": {
+    "start": "node src/bot.js",
+    "dev": "nodemon src/bot.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop bird-bot",
+    "pm2:restart": "pm2 restart bird-bot",
+    "pm2:delete": "pm2 delete bird-bot"
+  },
+  "keywords": ["discord", "bot", "bird", "gacha", "zoo"],
+  "author": "your-name",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "googleapis": "^131.0.0",
+    "dotenv": "^16.3.1",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.9.0"
+  }
+}
