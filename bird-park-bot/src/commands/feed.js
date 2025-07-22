@@ -275,6 +275,30 @@ module.exports = {
         return embed;
     },
 
+    async execute(interaction) {
+        try {
+            // 鳥たちの睡眠時間チェック（日本時間0:00-7:00）
+            const sleepCheck = this.checkBirdSleepTime();
+            if (sleepCheck.isSleeping) {
+                await interaction.reply({
+                    content: sleepCheck.message,
+                    ephemeral: true
+                });
+                return;
+            }
+
+            // データ初期化チェック
+            if (!birdData.initialized) {
+                await interaction.reply({
+                    content: '🔄 鳥データを読み込み中です...少々お待ちください',
+                    ephemeral: true
+                });
+                await birdData.initialize();
+            }
+
+            const birdName = interaction.options.getString('bird');
+            const food = interaction.options.getString('food');
+
     // 特別イベントチェック
     async checkForSpecialEvents(birdInfo, food, preference, interaction) {
         const result = await this.processFeedingResult(birdInfo, food, preference, interaction.user);
