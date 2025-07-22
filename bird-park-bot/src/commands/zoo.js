@@ -428,6 +428,60 @@ module.exports = {
         return areaActivities[Math.floor(Math.random() * areaActivities.length)];
     },
 
+    // 鳥の状態Embed
+    createBirdStatusEmbed(birdInfo) {
+        const { bird, area } = birdInfo;
+        const stayDuration = this.getStayDuration(bird.entryTime);
+        
+        // 睡眠時間チェック
+        const sleepStatus = this.checkSleepTime();
+        
+        const embed = new EmbedBuilder()
+            .setTitle(`🐦 ${bird.name}の様子`)
+            .setDescription(`*${bird.data.キャッチコピー}*`)
+            .setColor(sleepStatus.isSleeping ? 0x2F4F4F : 0x00AE86) // 睡眠時は暗い色
+            .addFields(
+                { name: '📍 現在地', value: `${area}エリア`, inline: true },
+                { name: '📅 滞在期間', value: stayDuration, inline: true },
+                { name: '😊 気分', value: sleepStatus.isSleeping ? '😴 夢の中' : this.getMoodEmoji(bird.mood), inline: true },
+                { name: '🎭 現在の様子', value: sleepStatus.isSleeping ? sleepStatus.sleepActivity : bird.activity, inline: false }
+            )
+            .setTimestamp();
+
+        // 餌やり状況（睡眠時は表示しない）
+        if (!sleepStatus.isSleeping) {
+            if (bird.lastFed) {
+                const fedAgo = this.getTimeSince(bird.lastFed);
+                embed.addFields({
+                    name: '🍽️ 最後の餌やり',
+                    value: `${fedAgo}前`,
+                    inline: true
+                });
+            } else {
+                embed.addFields({
+                    name: '🍽️ 餌やり',
+                    value: 'まだ餌をもらっていません',
+                    inline: true
+                });
+            }
+        } else {
+            embed.addFields({
+                name: '💤 睡眠中',
+                value: '朝7:00まで餌やりはお休みです',
+                inline: true
+            });
+        }
+
+        // 基本情報
+        embed.addFields({
+            name: '📊 基本情報',
+            value: `**全長:** ${bird.data.全長} (${bird.data.全長区分})\n**色:** ${bird.data.色}\n**好物:** ${bird.data.好物 || '設定なし'}`,
+            inline: false
+        });
+
+        return embed;
+    },
+
     // 滞在期間計算
     getStayDuration(entryTime) {
         const now = new Date();
