@@ -155,23 +155,25 @@ module.exports = {
 
     // 鳥類園が空かチェック
     isZooEmpty() {
-        return zooState.森林.length === 0 && zooState.草原.length === 0 && zooState.水辺.length === 0;
-    },
+    const zooManager = require('../utils/zooManager');
+    const zooState = zooManager.getZooState();
+    return zooState.森林.length === 0 && zooState.草原.length === 0 && zooState.水辺.length === 0;
+},
 
     // 鳥類園初期化
     async initializeZoo() {
         console.log('🏞️ 鳥類園を初期化中...');
         
         // 各エリアに5羽ずつ配置
-        zooState.森林 = this.assignBirdsToArea('森林', 5);
-        zooState.草原 = this.assignBirdsToArea('草原', 5);
-        zooState.水辺 = this.assignBirdsToArea('水辺', 5);
-        zooState.lastUpdate = new Date();
-        zooState.events = [];
+        const zooManager = require('../utils/zooManager');
+     const zooState = zooManager.getZooState();
+     zooState.森林 = this.assignBirdsToArea('森林', 5);
+     zooState.草原 = this.assignBirdsToArea('草原', 5);
+     zooState.水辺 = this.assignBirdsToArea('水辺', 5);
+     zooState.lastUpdate = new Date();
+     zooState.events = [];
 
-        // ログ記録
-        for (const area of ['森林', '草原', '水辺']) {
-            for (const bird of zooState[area]) {
+for (const bird of zooState[area]) {
                 await logger.logZoo('入園', area, bird.name);
             }
         }
@@ -217,6 +219,9 @@ module.exports = {
 
     // 鳥類園全体のEmbed
     createZooOverviewEmbed() {
+        const zooManager = require('../utils/zooManager');
+        const zooState = zooManager.getZooState();
+        
         const totalBirds = zooState.森林.length + zooState.草原.length + zooState.水辺.length;
         
         const embed = new EmbedBuilder()
@@ -529,11 +534,12 @@ module.exports = {
 
     // 鳥類園の状態取得（外部からアクセス用）
     getZooState() {
-        return zooState;
-    },
+    const zooManager = require('../utils/zooManager');
+    return zooManager.getZooState();
+}
 
-    // 鳥類園の状態設定（外部からアクセス用）
-    setZooState(newState) {
-        zooState = newState;
-    }
+setZooState(newState) {
+    const zooManager = require('../utils/zooManager');
+    zooManager.setZooState(newState);
+}
 };
