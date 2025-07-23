@@ -380,7 +380,7 @@ class ZooManager {
             for (const area of ['森林', '草原', '水辺']) {
                 for (const bird of this.zooState[area]) {
                     // 最後の餌やりから6時間以上経過で空腹
-                    const hungryThreshold = 6 * 60 * 60 * 1000; // 6時間
+                    const hungryThreshold = 4 * 60 * 60 * 1000; // 6時間
                     
                     if (!bird.lastFed || (now - bird.lastFed) > hungryThreshold) {
                         if (!bird.isHungry) {
@@ -388,7 +388,7 @@ class ZooManager {
                             bird.hungerNotified = false;
                             
                             // 空腹通知イベント（25%の確率）
-                            if (Math.random() < 0.25) {
+                            if (Math.random() < 0.50) {
                                 await this.addEvent(
                                     '空腹通知',
                                     `${bird.name}がお腹を空かせているようです！🍽️`,
