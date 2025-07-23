@@ -210,21 +210,18 @@ async function handleZooButtons(interaction) {
         case 'zoo_forest':
             await interaction.reply({ 
                 embeds: [zooCommand.createAreaDetailEmbed('森林')],
-                ephemeral: true 
             });
             break;
             
         case 'zoo_grassland':
             await interaction.reply({ 
                 embeds: [zooCommand.createAreaDetailEmbed('草原')],
-                ephemeral: true 
             });
             break;
             
         case 'zoo_waterside':
             await interaction.reply({ 
                 embeds: [zooCommand.createAreaDetailEmbed('水辺')],
-                ephemeral: true 
             });
             break;
     }
