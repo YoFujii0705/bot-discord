@@ -163,21 +163,21 @@ module.exports = {
                 message: 'は大好物の餌に大喜びしています！✨',
                 stayExtension: 2, // 2日延長
                 moodChange: 'happy',
-                specialChance: 0.3 // 30%で特別イベント
+                specialChance: 0.15 // 15%で特別イベント
             },
             acceptable: {
                 effect: '満足',
                 message: 'は餌をおいしそうに食べました！',
                 stayExtension: 1, // 1日延長
                 moodChange: 'normal',
-                specialChance: 0.1 // 10%で特別イベント
+                specialChance: 0.05 // 5%で特別イベント
             },
             dislike: {
                 effect: '微妙',
                 message: 'は餌をつついてみましたが、あまり興味がないようです...',
                 stayExtension: 0, // 延長なし
                 moodChange: 'normal',
-                specialChance: 0.05 // 5%で特別イベント
+                specialChance: 0.02 // 2%で特別イベント
             }
         };
 
@@ -247,17 +247,30 @@ module.exports = {
 
     // 餌やり結果Embed作成
     createFeedingResultEmbed(birdInfo, food, result) {
-        const { bird, area } = birdInfo;
-        
-        const foodEmojis = {
-    '麦': '🌾',           // 修正: '種子' → '麦'
+    const { bird, area } = birdInfo;
+    
+    // まず先にfoodEmojisオブジェクトを定義
+    const foodEmojis = {
+    '麦': '🌾',
+    '🌾麦': '🌾',      // 絵文字付きも対応
     '虫': '🐛',
+    '🐛虫': '🐛',      // 絵文字付きも対応
     '魚': '🐟',
-    '花蜜': '🍯',         // 修正: '蜜' → '花蜜'
+    '🐟魚': '🐟',      // 絵文字付きも対応
+    '花蜜': '🍯',
+    '🍯花蜜': '🍯',    // 絵文字付きも対応
     '木の実': '🥜',
+    '🥜木の実': '🥜',  // 絵文字付きも対応
     '青菜': '🌿',
-    'ねずみ': '🐁'
-       };
+    '🌿青菜': '🌿',    // 絵文字付きも対応
+    'ねずみ': '🐁',
+    '🐁ねずみ': '🐁'   // 絵文字付きも対応
+};
+    
+    // デバッグ用（foodEmojis定義後なので安全）
+    console.log(`🐛 DEBUG - food: "${food}"`);
+    console.log(`🐛 DEBUG - typeof food: ${typeof food}`);
+    console.log(`🐛 DEBUG - foodEmojis[food]: "${foodEmojis[food]}"`);
 
         const effectColors = {
             '大喜び': 0xFF69B4,
