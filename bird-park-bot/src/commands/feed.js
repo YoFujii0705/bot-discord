@@ -11,17 +11,18 @@ module.exports = {
                 .setDescription('餌をあげる鳥の名前')
                 .setRequired(true))
         .addStringOption(option =>
-            option.setName('food')
-                .setDescription('あげる餌の種類')
-                .addChoices(
-                    { name: '🌾 種子', value: '種子' },
-                    { name: '🐛 虫', value: '虫' },
-                    { name: '🐟 魚', value: '魚' },
-                    { name: '🍯 蜜', value: '蜜' },
-                    { name: '🥜 木の実', value: '木の実' },
-                    { name: '🌿 青菜', value: '青菜' }
-                )
-                .setRequired(true)),
+    option.setName('food')
+        .setDescription('あげる餌の種類')
+        .addChoices(
+            { name: '🌾 麦', value: '麦' },           // 修正: 種子 → 麦
+            { name: '🐛 虫', value: '虫' },
+            { name: '🐟 魚', value: '魚' },
+            { name: '🍯 花蜜', value: '花蜜' },       // 修正: 蜜 → 花蜜
+            { name: '🥜 木の実', value: '木の実' },
+            { name: '🌿 青菜', value: '青菜' },
+            { name: '🐁 ねずみ', value: 'ねずみ' }
+        )
+        .setRequired(true)),
 
     async execute(interaction) {
         try {
