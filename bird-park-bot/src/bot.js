@@ -193,38 +193,54 @@ async function handleComponentInteraction(interaction) {
 }
 
 // 鳥類園ボタン処理
+// ボタン処理部分を修正
 async function handleZooButtons(interaction) {
     const { customId } = interaction;
     const zooCommand = client.commands.get('zoo');
     
     if (!zooCommand) return;
 
-    switch (customId) {
-        case 'zoo_refresh':
-            // 全体表示を更新
-            await interaction.deferUpdate();
-            const embed = zooCommand.createZooOverviewEmbed();
-            const buttons = zooCommand.createZooButtons();
-            await interaction.editReply({ embeds: [embed], components: [buttons] });
-            break;
-            
-        case 'zoo_forest':
+    try {
+        switch (customId) {
+            case 'zoo_refresh':
+                // 全体表示を更新
+                await interaction.deferUpdate();
+                const embed = zooCommand.createZooOverviewEmbed();
+                const buttons = zooCommand.createZooButtons();
+                await interaction.editReply({ embeds: [embed], components: [buttons] });
+                break;
+                
+            case 'zoo_forest':
+                const forestEmbed = await zooCommand.createAreaDetailEmbed('森林');
+                await interaction.reply({ 
+                    embeds: [forestEmbed]
+                });
+                break;
+                
+            case 'zoo_grassland':
+                const grasslandEmbed = await zooCommand.createAreaDetailEmbed('草原');
+                await interaction.reply({ 
+                    embeds: [grasslandEmbed]
+                });
+                break;
+                
+            case 'zoo_waterside':
+                const watersideEmbed = await zooCommand.createAreaDetailEmbed('水辺');
+                await interaction.reply({ 
+                    embeds: [watersideEmbed]
+                });
+                break;
+        }
+    } catch (error) {
+        console.error('ボタン処理エラー:', error);
+        try {
             await interaction.reply({ 
-                embeds: [zooCommand.createAreaDetailEmbed('森林')],
+                content: 'エリア詳細の取得中にエラーが発生しました。', 
+                flags: 64 
             });
-            break;
-            
-        case 'zoo_grassland':
-            await interaction.reply({ 
-                embeds: [zooCommand.createAreaDetailEmbed('草原')],
-            });
-            break;
-            
-        case 'zoo_waterside':
-            await interaction.reply({ 
-                embeds: [zooCommand.createAreaDetailEmbed('水辺')],
-            });
-            break;
+        } catch (replyError) {
+            console.log('エラー応答失敗:', replyError.code);
+        }
     }
 }
 
