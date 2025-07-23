@@ -154,15 +154,16 @@ client.on('interactionCreate', async interaction => {
         const errorMessage = 'コマンドの実行中にエラーが発生しました。しばらく待ってから再度お試しください。';
         
         try {
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: errorMessage, ephemeral: true });
-            } else {
-                await interaction.reply({ content: errorMessage, ephemeral: true });
-            }
-        } catch (replyError) {
-            console.error('エラーメッセージの送信に失敗:', replyError);
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: errorMessage, ephemeral: true });
+        } else {
+            await interaction.reply({ content: errorMessage, ephemeral: true });
         }
+    } catch (replyError) {
+        // インタラクションが既にタイムアウトしている場合はログのみ
+        console.log('インタラクションタイムアウト（正常）:', replyError.code);
     }
+}
 });
 
 // コンポーネント（ボタン・セレクトメニュー）インタラクション処理
