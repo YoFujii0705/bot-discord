@@ -370,7 +370,11 @@ class ZooManager {
 
     // 空腹状態チェック
     async checkHungerStatus() {
-        try {
+    try {
+        // 睡眠時間中は空腹チェックをスキップ
+        if (this.isSleepTime()) {
+            return;
+        }
             const now = new Date();
             
             for (const area of ['森林', '草原', '水辺']) {
@@ -432,55 +436,33 @@ class ZooManager {
         return moods[Math.floor(Math.random() * moods.length)];
     }
 
+    // 睡眠時間判定
+isSleepTime() {
+    const now = new Date();
+    const jstTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
+    const hour = jstTime.getHours();
+    return hour >= 0 && hour < 7;
+}
+
     // イベント追加
     async addEvent(type, content, relatedBird = '') {
-        const event = {
-            type,
-            content,
-            relatedBird,
-            timestamp: new Date()
-        };
+    const event = {
+        type,
+        content,
+        relatedBird,
+        timestamp: new Date()
+    };
 
-        this.zooState.events.push(event);
+    this.zooState.events.push(event);
+    
+    // イベント履歴は最新20件まで保持
+    if (this.zooState.events.length > 20) {
+        this.zooState.events = this.zooState.events.slice(-20);
+    }
 
-// 空腹状態チェック
-    async checkHungerStatus() {
-        try {
-            // 睡眠時間中は空腹チェックをスキップ
-            if (this.isSleepTime()) {
-                return;
-            }
-            
-            const now = new Date();
-            
-            for (const area of ['森林', '草原', '水辺']) {
-                for (const bird of this.zooState[area]) {
-                    // 最後の餌やりから6時間以上経過で空腹
-                    const hungryThreshold = 6 * 60 * 60 * 1000; // 6時間
-                    
-                    if (!bird.lastFed || (now - bird.lastFed) > hungryThreshold) {
-                        if (!bird.isHungry) {
-                            bird.isHungry = true;
-                            bird.hungerNotified = false;
-                            
-                            // 空腹通知イベント（25%の確率）
-                            if (Math.random() < 0.25) {
-                                await this.addEvent(
-                                    '空腹通知',
-                                    `${bird.name}がお腹を空かせているようです！🍽️`,
-                                    bird.name
-                                );
-                            }
-                        }
-                    } else {
-                        bird.isHungry = false;
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('空腹状態チェックエラー:', error);
-        }
-    },
+    // ログ記録
+    await logger.logEvent(type, content, relatedBird);
+},
 
     // 睡眠時間判定
     isSleepTime() {
@@ -488,7 +470,7 @@ class ZooManager {
         const jstTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
         const hour = jstTime.getHours();
         return hour >= 0 && hour < 7;
-    },
+    }
         
         // イベント履歴は最新20件まで保持
         if (this.zooState.events.length > 20) {
