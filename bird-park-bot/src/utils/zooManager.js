@@ -533,15 +533,19 @@ isSleepTime() {
 
     // システム終了時のクリーンアップ
     shutdown() {
-        console.log('🔄 鳥類園管理システムをシャットダウン中...');
-        
-        this.scheduledTasks.forEach(task => {
-            if (task) task.destroy();
-        });
-        
-        this.scheduledTasks = [];
-        console.log('✅ 鳥類園管理システムのシャットダウン完了');
-    }
+    console.log('🔄 鳥類園管理システムをシャットダウン中...');
+    
+    this.scheduledTasks.forEach(task => {
+        if (task && typeof task.destroy === 'function') {
+            task.destroy();
+        } else if (task && typeof task.stop === 'function') {
+            task.stop();
+        }
+    });
+    
+    this.scheduledTasks = [];
+    console.log('✅ 鳥類園管理システムのシャットダウン完了');
+}
 }
 
 module.exports = new ZooManager();
