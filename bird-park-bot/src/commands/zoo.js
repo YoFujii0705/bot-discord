@@ -628,6 +628,81 @@ generateSleepActivity(bird, area) {
     return selectedActivities[Math.floor(Math.random() * selectedActivities.length)];
 },
 
+// 睡眠時間限定の特別ステータス生成（天気連動版）
+async generateSleepActivity(bird, area) {
+    const weatherManager = require('../utils/weather');
+    const weather = await weatherManager.getCurrentWeather();
+    
+    // 天気別睡眠ステータス
+    const weatherSleepActivities = {
+        rainy: [
+            '雨音を聞きながら安らかに眠っています',
+            '雨宿りをしながら静かに眠っています',
+            '雨の夜の涼しさの中で深く眠っています',
+            '雨粒の音に包まれて眠っています'
+        ],
+        snowy: [
+            '雪景色の中で静かに眠っています',
+            '雪に包まれて暖かく眠っています', 
+            '雪の結晶が舞い散る中で眠っています',
+            '雪明かりの下で安らかに眠っています'
+        ],
+        stormy: [
+            '嵐を避けて安全な場所で眠っています',
+            '風雨から身を守って眠っています',
+            '嵐が過ぎるのを待ちながら眠っています'
+        ],
+        foggy: [
+            '霧に包まれて神秘的に眠っています',
+            '霧の中でひっそりと眠っています',
+            '霧の静寂の中で安らかに眠っています'
+        ]
+    };
+
+    // 天気に応じた特別ステータスがあるかチェック
+    if (weather.condition !== 'unknown' && weatherSleepActivities[weather.condition]) {
+        const weatherActivities = weatherSleepActivities[weather.condition];
+        return weatherActivities[Math.floor(Math.random() * weatherActivities.length)];
+    }
+
+    // 天気情報がない場合は通常の睡眠ステータス
+    const sleepActivities = {
+        '森林': [
+            '羽を丸めて枝の上で眠っています',
+            '頭を羽の下に隠して休んでいます',
+            '木の洞で安全に眠っています',
+            '仲間と寄り添って眠っています',
+            '片脚で立ったまま器用に眠っています',
+            '羽繕いをしてから眠りにつきました',
+            '月明かりの下で静かに休んでいます',
+            '夜露に濡れながらも深く眠っています'
+        ],
+        '草原': [
+            '草むらの中で身を寄せ合って眠っています',
+            '地面に座り込んで丸くなって眠っています',
+            '風に揺れる草に包まれて眠っています',
+            '星空を見上げてから眠りについたようです',
+            '羽を広げて地面を温めながら眠っています',
+            '夜の静寂の中でぐっすりと眠っています',
+            '脚を羽にしまって丸い毛玉のようになっています',
+            '朝露が降りる前に夢の中です'
+        ],
+        '水辺': [
+            '水面近くの岩の上で眠っています',
+            '片脚を上げたまま器用に眠っています',
+            '首を背中に回して眠っています',
+            '水際で波音を聞きながら眠っています',
+            '羽に顔を埋めて眠っています',
+            'さざ波の音に包まれて安らかに眠っています',
+            '水草の間で身を隠して眠っています',
+            '月光が水面に映る中で静かに休んでいます'
+        ]
+    };
+
+    const areaActivities = sleepActivities[area] || sleepActivities['森林'];
+    return areaActivities[Math.floor(Math.random() * areaActivities.length)];
+},
+
     // 鳥類園の状態取得（外部からアクセス用）
     getZooState() {
     const zooManager = require('../utils/zooManager');
