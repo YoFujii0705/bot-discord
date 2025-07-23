@@ -279,38 +279,51 @@ for (const bird of zooState[area]) {
     };
 
     const info = areaInfo[area];
-    // zooManagerからデータを取得
     const zooManager = require('../utils/zooManager');
     const zooState = zooManager.getZooState();
     const birds = zooState[area];
 
-        const embed = new EmbedBuilder()
-            .setTitle(`${info.emoji} ${area}エリア詳細`)
-            .setDescription(info.description)
-            .setColor(info.color)
-            .setTimestamp();
+    // 睡眠時間チェック
+    const sleepStatus = this.checkSleepTime();
 
-        if (birds.length === 0) {
+    const embed = new EmbedBuilder()
+        .setTitle(`${info.emoji} ${area}エリア詳細`)
+        .setDescription(sleepStatus.isSleeping ? 
+            `${info.description}\n🌙 現在は夜間のため、鳥たちは静かに眠っています` : 
+            info.description)
+        .setColor(sleepStatus.isSleeping ? 0x2F4F4F : info.color)
+        .setTimestamp();
+
+    if (birds.length === 0) {
+        embed.addFields({
+            name: '現在の状況',
+            value: '現在このエリアには鳥がいません',
+            inline: false
+        });
+    } else {
+        birds.forEach((bird, index) => {
+            const stayDuration = this.getStayDuration(bird.entryTime);
+            let activityText;
+            
+            if (sleepStatus.isSleeping) {
+                // 睡眠時間限定の特別ステータス
+                const sleepActivity = this.generateSleepActivity(bird, area);
+                activityText = `😴 ${sleepActivity}\n📅 滞在期間: ${stayDuration}`;
+            } else {
+                // 通常時のステータス
+                activityText = `${bird.activity}\n📅 滞在期間: ${stayDuration}`;
+            }
+            
             embed.addFields({
-                name: '現在の状況',
-                value: '現在このエリアには鳥がいません',
-                inline: false
+                name: `${index + 1}. ${this.getSizeEmoji(bird.data.全長区分)} ${bird.name}`,
+                value: activityText,
+                inline: true
             });
-        } else {
-            birds.forEach((bird, index) => {
-                const stayDuration = this.getStayDuration(bird.entryTime);
-                const activityText = `${bird.activity}\n📅 滞在期間: ${stayDuration}`;
-                
-                embed.addFields({
-                    name: `${index + 1}. ${this.getSizeEmoji(bird.data.全長区分)} ${bird.name}`,
-                    value: activityText,
-                    inline: true
-                });
-            });
-        }
+        });
+    }
 
-        return embed;
-    },
+    return embed;
+},
 
     // 鳥の状態Embed
     createBirdStatusEmbed(birdInfo) {
@@ -531,6 +544,89 @@ for (const bird of zooState[area]) {
         };
         return sizeEmojis[size] || '🐦';
     },
+
+// 睡眠時間チェック
+checkSleepTime() {
+    const now = new Date();
+    const jstTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
+    const hour = jstTime.getHours();
+    
+    if (hour >= 0 && hour < 7) {
+        return { isSleeping: true };
+    }
+    
+    return { isSleeping: false };
+},
+
+// 睡眠時間限定の特別ステータス生成
+generateSleepActivity(bird, area) {
+    // エリア別睡眠ステータス
+    const sleepActivities = {
+        '森林': [
+            '羽を丸めて枝の上で眠っています',
+            '頭を羽の下に隠して休んでいます',
+            '木の洞で安全に眠っています',
+            '仲間と寄り添って眠っています',
+            '片脚で立ったまま器用に眠っています',
+            '羽繕いをしてから眠りにつきました',
+            '月明かりの下で静かに休んでいます',
+            '夜露に濡れながらも深く眠っています'
+        ],
+        '草原': [
+            '草むらの中で身を寄せ合って眠っています',
+            '地面に座り込んで丸くなって眠っています',
+            '風に揺れる草に包まれて眠っています',
+            '星空を見上げてから眠りについたようです',
+            '羽を広げて地面を温めながら眠っています',
+            '夜の静寂の中でぐっすりと眠っています',
+            '脚を羽にしまって丸い毛玉のようになっています',
+            '朝露が降りる前に夢の中です'
+        ],
+        '水辺': [
+            '水面近くの岩の上で眠っています',
+            '片脚を上げたまま器用に眠っています',
+            '首を背中に回して眠っています',
+            '水際で波音を聞きながら眠っています',
+            '羽に顔を埋めて眠っています',
+            'さざ波の音に包まれて安らかに眠っています',
+            '水草の間で身を隠して眠っています',
+            '月光が水面に映る中で静かに休んでいます'
+        ]
+    };
+
+    // 鳥のサイズ別睡眠ステータス
+    const sizeSleepActivities = {
+        '小': [
+            '小さな体を羽毛で包んで眠っています',
+            'ふわふわの羽毛が膨らんで丸いボールのようです',
+            '小さな足を羽の中にしまって眠っています'
+        ],
+        '中': [
+            '翼を体に巻きつけて眠っています',
+            '首を斜めに傾けて眠っています',
+            'バランスよく片脚で立って眠っています'
+        ],
+        '大': [
+            '堂々とした姿勢で眠っています',
+            '大きな翼を広げて仲間を包むように眠っています',
+            '威厳を保ったまま静かに眠っています'
+        ],
+        '特大': [
+            '大きな体でエリアを見守るように眠っています',
+            '王者の風格を漂わせながら眠っています',
+            '圧倒的な存在感で安らかに眠っています'
+        ]
+    };
+
+    // エリア別とサイズ別を組み合わせて選択
+    const areaActivities = sleepActivities[area] || sleepActivities['森林'];
+    const sizeActivities = sizeSleepActivities[bird.data.全長区分] || sizeSleepActivities['中'];
+    
+    // 70%の確率でエリア別、30%の確率でサイズ別
+    const selectedActivities = Math.random() < 0.7 ? areaActivities : sizeActivities;
+    
+    return selectedActivities[Math.floor(Math.random() * selectedActivities.length)];
+},
 
     // 鳥類園の状態取得（外部からアクセス用）
     getZooState() {
