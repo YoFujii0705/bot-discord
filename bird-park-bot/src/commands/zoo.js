@@ -52,15 +52,19 @@ module.exports = {
         }
     },
 
-    // 鳥類園全体表示
-    async handleViewCommand(interaction) {
-        const embed = this.createZooOverviewEmbed();
-        
-        await interaction.reply({ embeds: [embed] });
-        
-        // ログ記録
-        await logger.logZoo('全体表示', '全体', '', interaction.user.id, interaction.user.username);
-    },
+    // 鳥類園全体表示（修正版）
+async handleViewCommand(interaction) {
+    const embed = this.createZooOverviewEmbed();
+    const buttons = this.createZooButtons(); // ボタンを作成
+    
+    await interaction.reply({ 
+        embeds: [embed], 
+        components: [buttons] // ボタンを含めて送信
+    });
+    
+    // ログ記録
+    await logger.logZoo('全体表示', '全体', '', interaction.user.id, interaction.user.username);
+},
 
     // エリア詳細表示
     async handleAreaCommand(interaction) {
@@ -72,6 +76,31 @@ module.exports = {
         // ログ記録
         await logger.logZoo('エリア表示', area, '', interaction.user.id, interaction.user.username);
     },
+
+    // ボタン作成メソッド（新規追加）
+createZooButtons() {
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('zoo_forest')
+                .setLabel('🌲 森林エリア')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('zoo_grassland')
+                .setLabel('🌾 草原エリア')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('zoo_waterside')
+                .setLabel('🌊 水辺エリア')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('zoo_refresh')
+                .setLabel('🔄 更新')
+                .setStyle(ButtonStyle.Primary)
+        );
+    
+    return row;
+},
 
     // 鳥類園全体のEmbed
     createZooOverviewEmbed() {
