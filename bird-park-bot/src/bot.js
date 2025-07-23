@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 // ユーティリティとマネージャーのインポート
-const sheetsManager = require('./config/sheets');
+const sheetsManager = require('../config/sheets');
 const birdData = require('./utils/birdData');
 const logger = require('./utils/logger');
 const zooManager = require('./utils/zooManager');
