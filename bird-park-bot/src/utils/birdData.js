@@ -146,17 +146,51 @@ class BirdDataManager {
     }
 
     // 鳥の好物チェック
-    getFoodPreference(birdName, food) {
-        const bird = this.birds.find(b => b.名前 === birdName);
-        if (!bird) return 'unknown';
+    // birdData.js の getFoodPreference メソッドを以下に置き換え
 
-        const favorites = bird.好物 ? bird.好物.split('、').map(f => f.trim()) : [];
-        const acceptable = bird.食べられる餌 ? bird.食べられる餌.split('、').map(f => f.trim()) : [];
-
-        if (favorites.includes(food)) return 'favorite';
-        if (acceptable.includes(food)) return 'acceptable';
-        return 'dislike';
+// 鳥の好物チェック
+getFoodPreference(birdName, food) {
+    // Discord表記からスプレッドシート表記への変換
+    const foodMapping = {
+        '種子': '麦',
+        '蜜': '花蜜'
+    };
+    
+    // 変換が必要な場合は変換
+    const mappedFood = foodMapping[food] || food;
+    
+    // 部分一致で鳥を検索（feed.jsと同じロジック）
+    const bird = this.birds.find(b => 
+        b.名前.includes(birdName) || birdName.includes(b.名前)
+    );
+    
+    if (!bird) {
+        console.log(`⚠️ 鳥が見つかりません: ${birdName}`);
+        return 'unknown';
     }
+    
+    console.log(`🔍 鳥発見: ${bird.名前}, 餌: ${mappedFood}`);
+    
+    // 好物チェック
+    const favorites = bird.好物 ? bird.好物.split('、').map(f => f.trim()) : [];
+    console.log(`❤️ 好物: ${favorites.join(', ')}`);
+    
+    // 食べられる餌チェック  
+    const acceptable = bird.食べられる餌 ? bird.食べられる餌.split('、').map(f => f.trim()) : [];
+    console.log(`😊 食べられる餌: ${acceptable.join(', ')}`);
+    
+    if (favorites.includes(mappedFood)) {
+        console.log(`✨ ${mappedFood}は好物です！`);
+        return 'favorite';
+    }
+    if (acceptable.includes(mappedFood)) {
+        console.log(`😊 ${mappedFood}は食べられる餌です`);
+        return 'acceptable';
+    }
+    
+    console.log(`😐 ${mappedFood}はあまり好きではないようです`);
+    return 'dislike';
+}
 
     // 統計情報
     getStats() {
