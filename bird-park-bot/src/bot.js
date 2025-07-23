@@ -202,34 +202,50 @@ async function handleZooButtons(interaction) {
 
     try {
         switch (customId) {
-            case 'zoo_refresh':
-                // 全体表示を更新
-                await interaction.deferUpdate();
-                const embed = zooCommand.createZooOverviewEmbed();
-                const buttons = zooCommand.createZooButtons();
-                await interaction.editReply({ embeds: [embed], components: [buttons] });
-                break;
-                
             case 'zoo_forest':
-                const forestEmbed = await zooCommand.createAreaDetailEmbed('森林');
-                await interaction.reply({ 
-                    embeds: [forestEmbed]
-                });
-                break;
-                
-            case 'zoo_grassland':
-                const grasslandEmbed = await zooCommand.createAreaDetailEmbed('草原');
-                await interaction.reply({ 
-                    embeds: [grasslandEmbed]
-                });
-                break;
-                
-            case 'zoo_waterside':
-                const watersideEmbed = await zooCommand.createAreaDetailEmbed('水辺');
-                await interaction.reply({ 
-                    embeds: [watersideEmbed]
-                });
-                break;
+    try {
+        const forestEmbed = await zooCommand.createAreaDetailEmbed('森林');
+        await interaction.reply({ 
+            embeds: [forestEmbed]
+        });
+    } catch (error) {
+        console.error('森林エリア表示エラー:', error);
+        await interaction.reply({ 
+            content: '森林エリアの情報取得中にエラーが発生しました。', 
+            flags: 64 
+        });
+    }
+    break;
+    
+case 'zoo_grassland':
+    try {
+        const grasslandEmbed = await zooCommand.createAreaDetailEmbed('草原');
+        await interaction.reply({ 
+            embeds: [grasslandEmbed]
+        });
+    } catch (error) {
+        console.error('草原エリア表示エラー:', error);
+        await interaction.reply({ 
+            content: '草原エリアの情報取得中にエラーが発生しました。', 
+            flags: 64 
+        });
+    }
+    break;
+    
+case 'zoo_waterside':
+    try {
+        const watersideEmbed = await zooCommand.createAreaDetailEmbed('水辺');
+        await interaction.reply({ 
+            embeds: [watersideEmbed]
+        });
+    } catch (error) {
+        console.error('水辺エリア表示エラー:', error);
+        await interaction.reply({ 
+            content: '水辺エリアの情報取得中にエラーが発生しました。', 
+            flags: 64 
+        });
+    }
+    break;
         }
     } catch (error) {
         console.error('ボタン処理エラー:', error);
