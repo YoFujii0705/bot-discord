@@ -2,15 +2,6 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const birdData = require('../utils/birdData');
 const logger = require('../utils/logger');
 
-// 鳥類園の状態を管理（本来はデータベースやファイルに保存）
-let zooState = {
-    森林: [],
-    草原: [],
-    水辺: [],
-    lastUpdate: new Date(),
-    events: []
-};
-
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('zoo')
@@ -276,14 +267,17 @@ module.exports = {
 
     // エリア詳細Embed
     createAreaDetailEmbed(area) {
-        const areaInfo = {
-            '森林': { emoji: '🌲', description: '高い木々に囲まれた静かなエリア', color: 0x228B22 },
-            '草原': { emoji: '🌾', description: '開けた草地で鳥たちが自由に過ごすエリア', color: 0x9ACD32 },
-            '水辺': { emoji: '🌊', description: '池や小川がある水鳥たちのエリア', color: 0x4682B4 }
-        };
+    const areaInfo = {
+        '森林': { emoji: '🌲', description: '高い木々に囲まれた静かなエリア', color: 0x228B22 },
+        '草原': { emoji: '🌾', description: '開けた草地で鳥たちが自由に過ごすエリア', color: 0x9ACD32 },
+        '水辺': { emoji: '🌊', description: '池や小川がある水鳥たちのエリア', color: 0x4682B4 }
+    };
 
-        const info = areaInfo[area];
-        const birds = zooState[area];
+    const info = areaInfo[area];
+    // zooManagerからデータを取得
+    const zooManager = require('../utils/zooManager');
+    const zooState = zooManager.getZooState();
+    const birds = zooState[area];
 
         const embed = new EmbedBuilder()
             .setTitle(`${info.emoji} ${area}エリア詳細`)
