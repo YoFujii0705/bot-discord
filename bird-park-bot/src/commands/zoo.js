@@ -536,7 +536,7 @@ for (const bird of zooState[area]) {
     getZooState() {
     const zooManager = require('../utils/zooManager');
     return zooManager.getZooState();
-}
+},
 
 setZooState(newState) {
     const zooManager = require('../utils/zooManager');
