@@ -135,7 +135,7 @@ class ZooManager {
         }, { scheduled: false });
 
         // 空腹通知（1時間に1回チェック）
-        const hungerTask = cron.schedule('15 * * * *', async () => {
+        const hungerTask = cron.schedule('*/30 * * * *', async () => {
             await this.checkHungerStatus();
         }, { scheduled: false });
 
@@ -375,36 +375,90 @@ class ZooManager {
         if (this.isSleepTime()) {
             return;
         }
-            const now = new Date();
+        
+        const now = new Date();
             
-            for (const area of ['森林', '草原', '水辺']) {
-                for (const bird of this.zooState[area]) {
-                    // 最後の餌やりから6時間以上経過で空腹
-                    const hungryThreshold = 4 * 60 * 60 * 1000; // 6時間
-                    
-                    if (!bird.lastFed || (now - bird.lastFed) > hungryThreshold) {
-                        if (!bird.isHungry) {
-                            bird.isHungry = true;
-                            bird.hungerNotified = false;
-                            
-                            // 空腹通知イベント（25%の確率）
-                            if (Math.random() < 0.50) {
-                                await this.addEvent(
-                                    '空腹通知',
-                                    `${bird.name}がお腹を空かせているようです！🍽️`,
-                                    bird.name
-                                );
-                            }
+        for (const area of ['森林', '草原', '水辺']) {
+            for (const bird of this.zooState[area]) {
+                // 最後の餌やりから4時間以上経過で空腹（修正：6時間→4時間）
+                const hungryThreshold = 4 * 60 * 60 * 1000; // 4時間
+                
+                // 最後に餌をもらった時間（なければ入園時間を使用）
+                const lastFeedTime = bird.lastFed || bird.entryTime;
+                
+                if ((now - lastFeedTime) > hungryThreshold) {
+                    if (!bird.isHungry) {
+                        bird.isHungry = true;
+                        bird.hungerNotified = false;
+                        
+                        // 空腹時の活動に変更
+                        bird.activity = this.generateHungryActivity(area);
+                        
+                        // 空腹通知イベント（修正：25%→50%の確率）
+                        if (Math.random() < 0.50) {
+                            await this.addEvent(
+                                '空腹通知',
+                                `${bird.name}がお腹を空かせているようです！🍽️ `/feed bird:${bird.name} food:[餌の種類]` で餌をあげてみましょう`,
+                                bird.name
+                            );
+                            bird.hungerNotified = true;
                         }
-                    } else {
+                        
+                        console.log(`🍽️ ${bird.name} が空腹になりました (${area}エリア)`);
+                    }
+                } else {
+                    // 餌をもらって満腹状態に戻った場合
+                    if (bird.isHungry) {
                         bird.isHungry = false;
+                        bird.activity = this.generateActivity(area); // 通常活動に戻す
+                        console.log(`😊 ${bird.name} が満腹になりました (${area}エリア)`);
                     }
                 }
             }
-        } catch (error) {
-            console.error('空腹状態チェックエラー:', error);
         }
+    } catch (error) {
+        console.error('空腹状態チェックエラー:', error);
     }
+}
+
+    // 空腹時の活動生成
+generateHungryActivity(area) {
+    const hungryActivities = {
+        '森林': [
+            'お腹を空かせて餌を探し回っています',
+            '木の枝で寂しそうに鳴いています', 
+            '餌を求めてあちこち見回しています',
+            'お腹がぺこぺこで元気がありません',
+            '虫を探して忙しく動き回っています',
+            '木の実がないか必死に探しています',
+            '空腹で羽を垂らしています',
+            '食べ物を求めて鳴き続けています'
+        ],
+        '草原': [
+            '地面をつついて何か食べ物を探しています',
+            'お腹を空かせてそわそわしています',
+            '餌を求めて草むらを探しています',
+            '空腹で少し疲れているようです',
+            '種を探して地面を掘っています',
+            'お腹が空いて落ち着かない様子です',
+            '青菜を求めてうろうろしています',
+            '空腹で鳴き声も弱々しいです'
+        ],
+        '水辺': [
+            '水面を見つめて魚を探しています',
+            'お腹を空かせて水辺をうろうろしています',
+            '餌を求めて浅瀬を歩き回っています',
+            '空腹で羽を垂らしています',
+            '魚影を追いかけていますが捕まえられません',
+            '水草の間を必死に探しています',
+            'お腹が空いて水面をじっと見つめています',
+            '空腹でため息をついているようです'
+        ]
+    };
+
+    const activities = hungryActivities[area] || hungryActivities['森林'];
+    return activities[Math.floor(Math.random() * activities.length)];
+}
 
     // 活動生成
     generateActivity(area) {
@@ -463,6 +517,71 @@ isSleepTime() {
     // ログ記録
     await logger.logEvent(type, content, relatedBird);
 },
+
+    // 手動で空腹チェックを実行（テスト用）
+async manualHungerCheck() {
+    console.log('🧪 手動空腹チェックを実行...');
+    await this.checkHungerStatus();
+    return this.getHungerStatistics();
+}
+
+// 特定の鳥を強制的に空腹にする（テスト用）
+forceHungry(birdName = null) {
+    const now = new Date();
+    const fiveHoursAgo = new Date(now.getTime() - 5 * 60 * 60 * 1000);
+    
+    let count = 0;
+    
+    for (const area of ['森林', '草原', '水辺']) {
+        for (const bird of this.zooState[area]) {
+            if (!birdName || bird.name.includes(birdName) || birdName.includes(bird.name)) {
+                bird.lastFed = fiveHoursAgo; // 5時間前に設定
+                bird.isHungry = true;
+                bird.hungerNotified = false;
+                bird.activity = this.generateHungryActivity(area);
+                count++;
+                
+                if (birdName) break; // 特定の鳥のみの場合は1羽で終了
+            }
+        }
+        if (birdName && count > 0) break;
+    }
+    
+    console.log(`🧪 ${count}羽の鳥を強制的に空腹状態にしました`);
+    return count;
+}
+
+// 空腹統計取得（テスト用）
+getHungerStatistics() {
+    const allBirds = this.getAllBirds();
+    const now = new Date();
+    
+    const stats = {
+        totalBirds: allBirds.length,
+        hungryBirds: 0,
+        birdDetails: []
+    };
+    
+    for (const bird of allBirds) {
+        const lastFeedTime = bird.lastFed || bird.entryTime;
+        const hoursSinceLastFeed = Math.floor((now - lastFeedTime) / (1000 * 60 * 60));
+        
+        if (bird.isHungry) {
+            stats.hungryBirds++;
+        }
+        
+        stats.birdDetails.push({
+            name: bird.name,
+            area: bird.area,
+            isHungry: bird.isHungry,
+            hoursSinceLastFeed: hoursSinceLastFeed,
+            hungerNotified: bird.hungerNotified,
+            activity: bird.activity
+        });
+    }
+    
+    return stats;
+}
 
     // 睡眠時間判定
     isSleepTime() {
