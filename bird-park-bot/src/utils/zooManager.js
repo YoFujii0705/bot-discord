@@ -237,8 +237,8 @@ class ZooManager {
 
     // 出発時間計算（既存）
     calculateDepartureTime() {
-        const minDays = 3;
-        const maxDays = 7;
+        const minDays = 2;
+        const maxDays = 5;
         const daysToStay = Math.floor(Math.random() * (maxDays - minDays + 1)) + minDays;
         
         const departureTime = new Date();
