@@ -3,7 +3,7 @@ const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('disc
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('scheduler-test')
-        .setDescription('🧪 スケジューラーのテスト用コマンド（管理者限定）')
+        .setDescription('🧪 スケジューラーのテスト（管理者限定）')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('zoo-status')
@@ -27,7 +27,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
-        // 管理者チェック
         if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
             await interaction.reply({
                 content: '❌ このコマンドは管理者のみ使用できます。',
@@ -59,10 +58,13 @@ module.exports = {
             }
         } catch (error) {
             console.error('スケジューラーテストエラー:', error);
-            await interaction.reply({
-                content: '❌ テストの実行中にエラーが発生しました。',
-                ephemeral: true
-            });
+            
+            const errorMessage = '❌ テストの実行中にエラーが発生しました。';
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({ content: errorMessage, ephemeral: true });
+            } else {
+                await interaction.reply({ content: errorMessage, ephemeral: true });
+            }
         }
     },
 
@@ -81,7 +83,7 @@ module.exports = {
         } catch (error) {
             console.error('鳥類園状況投稿テストエラー:', error);
             await interaction.editReply({
-                content: '❌ 鳥類園状況投稿テストでエラーが発生しました。',
+                content: '❌ 鳥類園状況投稿テストでエラーが発生しました。ログを確認してください。',
             });
         }
     },
@@ -101,7 +103,7 @@ module.exports = {
         } catch (error) {
             console.error('朝の挨拶投稿テストエラー:', error);
             await interaction.editReply({
-                content: '❌ 朝の挨拶投稿テストでエラーが発生しました。',
+                content: '❌ 朝の挨拶投稿テストでエラーが発生しました。ログを確認してください。',
             });
         }
     },
@@ -121,7 +123,7 @@ module.exports = {
         } catch (error) {
             console.error('今日の鳥投稿テストエラー:', error);
             await interaction.editReply({
-                content: '❌ 今日の鳥投稿テストでエラーが発生しました。',
+                content: '❌ 今日の鳥投稿テストでエラーが発生しました。ログを確認してください。',
             });
         }
     },
@@ -141,7 +143,7 @@ module.exports = {
         } catch (error) {
             console.error('週次レポートテストエラー:', error);
             await interaction.editReply({
-                content: '❌ 週次レポートテストでエラーが発生しました。',
+                content: '❌ 週次レポートテストでエラーが発生しました。ログを確認してください。',
             });
         }
     },
@@ -168,13 +170,17 @@ module.exports = {
         description += '**各サーバーの投稿先チャンネル:**\n';
         
         for (const [guildId, guild] of client.guilds.cache) {
-            const scheduler = require('../utils/scheduler');
-            const channel = scheduler.findBroadcastChannel(guild);
-            
-            if (channel) {
-                description += `✅ **${guild.name}**: #${channel.name} (${channel.id})\n`;
-            } else {
-                description += `❌ **${guild.name}**: 投稿可能なチャンネルが見つかりません\n`;
+            try {
+                const scheduler = require('../utils/scheduler');
+                const channel = scheduler.findBroadcastChannel(guild);
+                
+                if (channel) {
+                    description += `✅ **${guild.name}**: #${channel.name} (${channel.id})\n`;
+                } else {
+                    description += `❌ **${guild.name}**: 投稿可能なチャンネルが見つかりません\n`;
+                }
+            } catch (error) {
+                description += `⚠️ **${guild.name}**: チャンネル確認エラー\n`;
             }
         }
 
