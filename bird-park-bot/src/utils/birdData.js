@@ -145,81 +145,65 @@ class BirdDataManager {
         return selectedThemes;
     }
 
+    // 鳥の好物チェック（修正版）
     getFoodPreference(birdName, food) {
-    // Discord表記からスプレッドシート表記への変換
-    const foodMapping = {
-        '種子': '麦',
-        '蜜': '花蜜'
-    };
-    
-    // 変換が必要な場合は変換
-    const mappedFood = foodMapping[food] || food;
-    
-    // 部分一致で鳥を検索（feed.jsと同じロジック）
-    const bird = this.birds.find(b => 
-        b.名前.includes(birdName) || birdName.includes(b.名前)
-    );
-    
-    if (!bird) {
-        console.log(`⚠️ 鳥が見つかりません: ${birdName}`);
-        return 'unknown';
-    }
-    
-    console.log(`🔍 鳥発見: ${bird.名前}, 餌: ${mappedFood}`);
-    
-    // 好物チェック（全角・半角両方の区切り文字に対応）
-    const favorites = bird.好物 ? bird.好物.split(/[、,]/).map(f => f.trim()) : [];
-    console.log(`❤️ 好物: ${favorites.join(', ')}`);
-    
-    // 食べられる餌チェック（全角・半角両方の区切り文字に対応）
-    const acceptable = bird.食べられる餌 ? bird.食べられる餌.split(/[、,]/).map(f => f.trim()) : [];
-    console.log(`😊 食べられる餌: ${acceptable.join(', ')}`);
-    
-    // 詳細デバッグ追加
-    console.log(`🔍 DEBUG - 検索する餌: "${mappedFood}"`);
-    console.log(`🔍 DEBUG - 餌の文字コード:`, [...mappedFood].map(c => c.charCodeAt(0)));
-    
-    favorites.forEach((fav, index) => {
-        console.log(`🔍 DEBUG - 好物[${index}]: "${fav}"`);
-        console.log(`🔍 DEBUG - 好物[${index}]の文字コード:`, [...fav].map(c => c.charCodeAt(0)));
-        console.log(`🔍 DEBUG - includes結果: ${fav.includes(mappedFood)} | ${mappedFood.includes(fav)}`);
-        console.log(`🔍 DEBUG - 完全一致: ${fav === mappedFood}`);
-    });
-    
-    // より厳密なチェック（絵文字を除去して比較）
-    const cleanMappedFood = mappedFood.replace(/[\u{1F000}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
-    console.log(`🔍 DEBUG - 絵文字除去後の餌: "${cleanMappedFood}"`);
-    
-    for (const fav of favorites) {
-        const cleanFav = fav.replace(/[\u{1F000}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
-        console.log(`🔍 DEBUG - 絵文字除去後の好物: "${cleanFav}"`);
+        // Discord表記からスプレッドシート表記への変換
+        const foodMapping = {
+            '種子': '麦',
+            '蜜': '花蜜'
+        };
         
-        if (cleanFav === cleanMappedFood) {
-            console.log(`✨ 絵文字除去後マッチ: ${mappedFood}は好物です！`);
-            return 'favorite';
+        // 変換が必要な場合は変換
+        const mappedFood = foodMapping[food] || food;
+        
+        // 部分一致で鳥を検索（feed.jsと同じロジック）
+        const bird = this.birds.find(b => 
+            b.名前.includes(birdName) || birdName.includes(b.名前)
+        );
+        
+        if (!bird) {
+            console.log(`⚠️ 鳥が見つかりません: ${birdName}`);
+            return 'unknown';
         }
-    }
-    
-    // 絵文字込みでの直接チェック
-    for (const fav of favorites) {
-        if (fav === mappedFood || fav.includes(mappedFood) || mappedFood.includes(fav)) {
-            console.log(`✨ 直接マッチ: ${mappedFood}は好物です！`);
-            return 'favorite';
+        
+        console.log(`🔍 鳥発見: ${bird.名前}, 餌: ${mappedFood}`);
+        
+        // 好物チェック（全角・半角両方の区切り文字に対応）
+        const favorites = bird.好物 ? bird.好物.split(/[、,]/).map(f => f.trim()) : [];
+        console.log(`❤️ 好物: ${favorites.join(', ')}`);
+        
+        // 食べられる餌チェック（全角・半角両方の区切り文字に対応）
+        const acceptable = bird.食べられる餌 ? bird.食べられる餌.split(/[、,]/).map(f => f.trim()) : [];
+        console.log(`😊 食べられる餌: ${acceptable.join(', ')}`);
+        
+        // 絵文字除去して比較
+        const cleanMappedFood = mappedFood.replace(/[\u{1F000}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
+        console.log(`🔍 DEBUG - 絵文字除去後の餌: "${cleanMappedFood}"`);
+        
+        // 好物チェック
+        for (const fav of favorites) {
+            const cleanFav = fav.replace(/[\u{1F000}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
+            console.log(`🔍 DEBUG - 絵文字除去後の好物: "${cleanFav}"`);
+            
+            if (cleanFav === cleanMappedFood || fav === mappedFood) {
+                console.log(`✨ ${mappedFood}は好物です！`);
+                return 'favorite';
+            }
         }
-    }
-    
-    // 食べられる餌のチェック
-    for (const acc of acceptable) {
-        const cleanAcc = acc.replace(/[\u{1F000}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
-        if (cleanAcc === cleanMappedFood || acc === mappedFood || acc.includes(mappedFood) || mappedFood.includes(acc)) {
-            console.log(`😊 ${mappedFood}は食べられる餌です`);
-            return 'acceptable';
+        
+        // 食べられる餌チェック
+        for (const acc of acceptable) {
+            const cleanAcc = acc.replace(/[\u{1F000}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
+            
+            if (cleanAcc === cleanMappedFood || acc === mappedFood) {
+                console.log(`😊 ${mappedFood}は食べられる餌です`);
+                return 'acceptable';
+            }
         }
+        
+        console.log(`😐 ${mappedFood}はあまり好きではないようです`);
+        return 'dislike';
     }
-    
-    console.log(`😐 ${mappedFood}はあまり好きではないようです`);
-    return 'dislike';
-}
 
     // 統計情報
     getStats() {
