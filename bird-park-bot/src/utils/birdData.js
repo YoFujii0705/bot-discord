@@ -145,13 +145,7 @@ class BirdDataManager {
         return selectedThemes;
     }
 
-    // 鳥の好物チェック
-    // birdData.js の getFoodPreference メソッドを以下に置き換え
-
-// 鳥の好物チェック
-// birdData.js の getFoodPreference メソッドを以下に置き換え
-
-getFoodPreference(birdName, food) {
+    getFoodPreference(birdName, food) {
     // Discord表記からスプレッドシート表記への変換
     const foodMapping = {
         '種子': '麦',
@@ -173,12 +167,12 @@ getFoodPreference(birdName, food) {
     
     console.log(`🔍 鳥発見: ${bird.名前}, 餌: ${mappedFood}`);
     
-    // 好物チェック
-    const favorites = bird.好物 ? bird.好物.split('、').map(f => f.trim()) : [];
+    // 好物チェック（全角・半角両方の区切り文字に対応）
+    const favorites = bird.好物 ? bird.好物.split(/[、,]/).map(f => f.trim()) : [];
     console.log(`❤️ 好物: ${favorites.join(', ')}`);
     
-    // 食べられる餌チェック  
-    const acceptable = bird.食べられる餌 ? bird.食べられる餌.split('、').map(f => f.trim()) : [];
+    // 食べられる餌チェック（全角・半角両方の区切り文字に対応）
+    const acceptable = bird.食べられる餌 ? bird.食べられる餌.split(/[、,]/).map(f => f.trim()) : [];
     console.log(`😊 食べられる餌: ${acceptable.join(', ')}`);
     
     // 詳細デバッグ追加
@@ -206,14 +200,21 @@ getFoodPreference(birdName, food) {
         }
     }
     
-    // 従来のチェック
-    if (favorites.includes(mappedFood)) {
-        console.log(`✨ ${mappedFood}は好物です！`);
-        return 'favorite';
+    // 絵文字込みでの直接チェック
+    for (const fav of favorites) {
+        if (fav === mappedFood || fav.includes(mappedFood) || mappedFood.includes(fav)) {
+            console.log(`✨ 直接マッチ: ${mappedFood}は好物です！`);
+            return 'favorite';
+        }
     }
-    if (acceptable.includes(mappedFood)) {
-        console.log(`😊 ${mappedFood}は食べられる餌です`);
-        return 'acceptable';
+    
+    // 食べられる餌のチェック
+    for (const acc of acceptable) {
+        const cleanAcc = acc.replace(/[\u{1F000}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
+        if (cleanAcc === cleanMappedFood || acc === mappedFood || acc.includes(mappedFood) || mappedFood.includes(acc)) {
+            console.log(`😊 ${mappedFood}は食べられる餌です`);
+            return 'acceptable';
+        }
     }
     
     console.log(`😐 ${mappedFood}はあまり好きではないようです`);
