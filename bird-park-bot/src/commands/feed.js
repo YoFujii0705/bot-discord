@@ -25,105 +25,116 @@ module.exports = {
         .setRequired(true)),
 
     async execute(interaction) {
-        try {
-            // 鳥たちの睡眠時間チェック（日本時間0:00-7:00）
-            const sleepCheck = this.checkBirdSleepTime();
-            if (sleepCheck.isSleeping) {
-                await interaction.reply({
-                    content: sleepCheck.message,
-                    ephemeral: true
-                });
-                return;
-            }
-
-            // データ初期化チェック
-            if (!birdData.initialized) {
-                await interaction.reply({
-                    content: '🔄 鳥データを読み込み中です...少々お待ちください',
-                    ephemeral: true
-                });
-                await birdData.initialize();
-            }
-
-            const birdName = interaction.options.getString('bird');
-            const food = interaction.options.getString('food');
-
-            // 鳥類園で鳥を検索
-            const birdInfo = this.findBirdInZoo(birdName);
-            
-            if (!birdInfo) {
-                await interaction.reply({
-                    content: `🔍 "${birdName}" は現在鳥類園にいないようです。\n\`/zoo view\` で現在いる鳥を確認してください。`,
-                    ephemeral: true
-                });
-                return;
-            }
-
-            // 餌やりクールダウンチェック
-            const cooldownResult = this.checkFeedingCooldown(birdInfo.bird, interaction.user.id);
-            if (!cooldownResult.canFeed) {
-                await interaction.reply({
-                    content: `⏰ ${birdInfo.bird.name}にはまだ餌をあげられません。\n次回餌やり可能時刻: ${cooldownResult.nextFeedTime}`,
-                    ephemeral: true
-                });
-                return;
-            }
-
-            // 餌の好み判定
-            const preference = birdData.getFoodPreference(birdName, food);
-            const feedResult = this.processFeedingResult(birdInfo, food, preference, interaction.user);
-
-            // 鳥の状態更新
-            this.updateBirdAfterFeeding(birdInfo.bird, food, preference, interaction.user.id);
-
-            // 結果表示
-            const embed = this.createFeedingResultEmbed(birdInfo, food, feedResult);
-            await interaction.reply({ embeds: [embed] });
-
-            // ログ記録
-            await logger.logFeed(
-                interaction.user.id,
-                interaction.user.username,
-                birdName,
-                food,
-                feedResult.effect
-            );
-
-            // 特別なイベント発生チェック
-            await this.checkForSpecialEvents(birdInfo, food, preference, interaction);
-
-        } catch (error) {
-            console.error('餌やりコマンドエラー:', error);
-            await logger.logError('餌やりコマンド', error, {
-                userId: interaction.user.id,
-                birdName: interaction.options.getString('bird'),
-                food: interaction.options.getString('food')
-            });
-
-            const errorMessage = '餌やりの実行中にエラーが発生しました。';
-            if (interaction.replied) {
-                await interaction.followUp({ content: errorMessage, ephemeral: true });
-            } else {
-                await interaction.reply({ content: errorMessage, ephemeral: true });
-            }
-        }
-    },
-
-    // 鳥類園で鳥を検索
-    findBirdInZoo(birdName) {
-        const zooManager = require('../utils/zooManager');
-        const zooState = zooManager.getZooState();
+    try {
+        const guildId = interaction.guild.id; // サーバーID取得
         
-        for (const area of ['森林', '草原', '水辺']) {
-            const bird = zooState[area].find(b => 
-                b.name.includes(birdName) || birdName.includes(b.name)
-            );
-            if (bird) {
-                return { bird, area };
-            }
+        // 鳥たちの睡眠時間チェック（日本時間0:00-7:00）
+        const sleepCheck = this.checkBirdSleepTime();
+        if (sleepCheck.isSleeping) {
+            await interaction.reply({
+                content: sleepCheck.message,
+                ephemeral: true
+            });
+            return;
         }
-        return null;
-    },
+
+        // データ初期化チェック
+        if (!birdData.initialized) {
+            await interaction.reply({
+                content: '🔄 鳥データを読み込み中です...少々お待ちください',
+                ephemeral: true
+            });
+            await birdData.initialize();
+        }
+
+        // サーバー別初期化
+        const zooManager = require('../utils/zooManager');
+        await zooManager.initializeServer(guildId);
+
+        const birdName = interaction.options.getString('bird');
+        const food = interaction.options.getString('food');
+
+        // 鳥類園で鳥を検索（サーバー別）
+        const birdInfo = this.findBirdInZoo(birdName, guildId);
+        
+        if (!birdInfo) {
+            await interaction.reply({
+                content: `🔍 "${birdName}" は現在この鳥類園にいないようです。\n\`/zoo view\` で現在いる鳥を確認してください。`,
+                ephemeral: true
+            });
+            return;
+        }
+
+        // 餌やりクールダウンチェック
+        const cooldownResult = this.checkFeedingCooldown(birdInfo.bird, interaction.user.id);
+        if (!cooldownResult.canFeed) {
+            await interaction.reply({
+                content: `⏰ ${birdInfo.bird.name}にはまだ餌をあげられません。\n次回餌やり可能時刻: ${cooldownResult.nextFeedTime}`,
+                ephemeral: true
+            });
+            return;
+        }
+
+        // 餌の好み判定
+        const preference = birdData.getFoodPreference(birdName, food);
+        const feedResult = this.processFeedingResult(birdInfo, food, preference, interaction.user);
+
+        // 鳥の状態更新
+        this.updateBirdAfterFeeding(birdInfo.bird, food, preference, interaction.user.id);
+
+        // 結果表示
+        const embed = this.createFeedingResultEmbed(birdInfo, food, feedResult);
+        await interaction.reply({ embeds: [embed] });
+
+        // ログ記録（サーバーID追加）
+        await logger.logFeed(
+            interaction.user.id,
+            interaction.user.username,
+            birdName,
+            food,
+            feedResult.effect,
+            guildId
+        );
+
+        // 特別なイベント発生チェック（サーバー別）
+        await this.checkForSpecialEvents(birdInfo, food, preference, interaction, guildId);
+
+        // データ保存
+        await zooManager.saveServerZoo(guildId);
+
+    } catch (error) {
+        console.error('餌やりコマンドエラー:', error);
+        await logger.logError('餌やりコマンド', error, {
+            userId: interaction.user.id,
+            birdName: interaction.options.getString('bird'),
+            food: interaction.options.getString('food'),
+            guildId: interaction.guild.id
+        });
+
+        const errorMessage = '餌やりの実行中にエラーが発生しました。';
+        if (interaction.replied) {
+            await interaction.followUp({ content: errorMessage, ephemeral: true });
+        } else {
+            await interaction.reply({ content: errorMessage, ephemeral: true });
+        }
+    }
+},
+    // 鳥類園で鳥を検索（サーバー別）
+findBirdInZoo(birdName, guildId) {
+    const zooManager = require('../utils/zooManager');
+    const zooState = zooManager.getZooState(guildId);
+    
+    for (const area of ['森林', '草原', '水辺']) {
+        const bird = zooState[area].find(b => 
+            b.name.includes(birdName) || birdName.includes(b.name)
+        );
+        if (bird) {
+            return { bird, area };
+        }
+    }
+    return null;
+},
+
 
     // 餌やりクールダウンチェック
     checkFeedingCooldown(bird, userId) {
@@ -303,30 +314,31 @@ module.exports = {
         return embed;
     },
 
-    // 特別イベントチェック
-    async checkForSpecialEvents(birdInfo, food, preference, interaction) {
-        const result = this.processFeedingResult(birdInfo, food, preference, interaction.user);
+    // 特別イベントチェック（サーバー別）
+async checkForSpecialEvents(birdInfo, food, preference, interaction, guildId) {
+    const result = this.processFeedingResult(birdInfo, food, preference, interaction.user);
+    
+    // 特別イベント発生判定
+    if (Math.random() < result.specialChance) {
+        const event = this.generateSpecialEvent(birdInfo, food, preference, interaction.user);
         
-        // 特別イベント発生判定
-        if (Math.random() < result.specialChance) {
-            const event = this.generateSpecialEvent(birdInfo, food, preference, interaction.user);
-            
-            setTimeout(async () => {
-                try {
-                    await interaction.followUp({ embeds: [event.embed] });
-                    
-                    // イベントログ記録
-                    await logger.logEvent(
-                        '餌やりイベント',
-                        event.description,
-                        birdInfo.bird.name
-                    );
-                } catch (error) {
-                    console.error('特別イベント送信エラー:', error);
-                }
-            }, 3000); // 3秒後に発生
-        }
-    },
+        setTimeout(async () => {
+            try {
+                await interaction.followUp({ embeds: [event.embed] });
+                
+                // イベントログ記録（サーバーID追加）
+                await logger.logEvent(
+                    '餌やりイベント',
+                    event.description,
+                    birdInfo.bird.name,
+                    guildId
+                );
+            } catch (error) {
+                console.error('特別イベント送信エラー:', error);
+            }
+        }, 3000); // 3秒後に発生
+    }
+},
 
     // 特別イベント生成
     generateSpecialEvent(birdInfo, food, preference, user) {
