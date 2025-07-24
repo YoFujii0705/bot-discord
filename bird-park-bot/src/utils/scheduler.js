@@ -308,7 +308,164 @@ class Scheduler {
         embed.setFooter({ text: '来週もよろしくお願いします！' });
         
         return embed;
+    },
+
+    // scheduler.js に以下を追加
+
+// 鳥類園状況の自動投稿（例：毎日9:00と18:00）
+const zooStatusTask = cron.schedule('0 9,18 * * *', async () => {
+    try {
+        console.log('🏞️ 鳥類園状況の自動投稿を開始...');
+        await postZooStatusToAllServers();
+    } catch (error) {
+        console.error('鳥類園自動投稿エラー:', error);
+        await logger.logError('鳥類園自動投稿', error);
     }
+}, { scheduled: false });
+
+// 全サーバーに鳥類園状況を投稿
+async function postZooStatusToAllServers() {
+    const zooManager = require('./zooManager');
+    const zooCommand = client.commands.get('zoo');
+    
+    if (!zooCommand) {
+        console.error('❌ zooコマンドが見つかりません');
+        return;
+    }
+
+    // Bot参加中の全サーバーを取得
+    const guilds = client.guilds.cache;
+    console.log(`📡 ${guilds.size}個のサーバーに鳥類園状況を投稿中...`);
+
+    for (const [guildId, guild] of guilds) {
+        try {
+            // 投稿チャンネルを取得（環境変数またはデフォルト）
+            const channelId = process.env.ZOO_CHANNEL_ID || process.env.NOTIFICATION_CHANNEL_ID;
+            let channel = null;
+
+            if (channelId) {
+                channel = guild.channels.cache.get(channelId);
+            }
+            
+            // 指定チャンネルがない場合は、一般的なチャンネル名で検索
+            if (!channel) {
+                channel = guild.channels.cache.find(ch => 
+                    ch.name.includes('鳥類園') || 
+                    ch.name.includes('bird') || 
+                    ch.name.includes('zoo') ||
+                    ch.name.includes('general') ||
+                    ch.name.includes('一般')
+                );
+            }
+
+            // それでもない場合は、最初のテキストチャンネル
+            if (!channel) {
+                channel = guild.channels.cache.find(ch => ch.type === 0); // テキストチャンネル
+            }
+
+            if (!channel) {
+                console.log(`⚠️ ${guild.name}: 投稿可能なチャンネルが見つかりません`);
+                continue;
+            }
+
+            // サーバー別に鳥類園を初期化
+            await zooManager.initializeServer(guildId);
+
+            // 鳥類園のEmbedを作成
+            const embed = zooCommand.createZooOverviewEmbed(guildId);
+            const buttons = zooCommand.createZooButtons();
+
+            // 自動投稿用にタイトルとメッセージを調整
+            const autoPostEmbed = EmbedBuilder.from(embed)
+                .setTitle('🏞️ 今日の鳥類園の様子')
+                .setDescription(`${embed.data.description}\n\n🕐 ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} 現在の状況`)
+                .setFooter({ 
+                    text: `自動投稿 | ${embed.data.footer?.text || ''}` 
+                });
+
+            // 投稿
+            await channel.send({ 
+                embeds: [autoPostEmbed], 
+                components: [buttons] 
+            });
+
+            console.log(`✅ ${guild.name} (${channel.name}) に投稿完了`);
+
+            // 投稿間隔を空ける（レート制限対策）
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+        } catch (error) {
+            console.error(`❌ ${guild.name} への投稿エラー:`, error);
+            // エラーが出ても他のサーバーへの投稿は続行
+        }
+    }
+
+    console.log('🎉 全サーバーへの鳥類園投稿が完了しました');
+}
+
+// 特定の時間に特別な投稿（例：朝の挨拶）
+const morningZooTask = cron.schedule('0 8 * * *', async () => {
+    try {
+        console.log('🌅 朝の鳥類園挨拶投稿を開始...');
+        await postMorningZooGreeting();
+    } catch (error) {
+        console.error('朝の挨拶投稿エラー:', error);
+    }
+}, { scheduled: false });
+
+// 朝の挨拶投稿
+async function postMorningZooGreeting() {
+    const zooManager = require('./zooManager');
+    const guilds = client.guilds.cache;
+
+    for (const [guildId, guild] of guilds) {
+        try {
+            const channelId = process.env.ZOO_CHANNEL_ID || process.env.NOTIFICATION_CHANNEL_ID;
+            let channel = guild.channels.cache.get(channelId);
+            
+            if (!channel) {
+                channel = guild.channels.cache.find(ch => 
+                    ch.name.includes('鳥類園') || ch.name.includes('bird')
+                );
+            }
+
+            if (!channel) continue;
+
+            await zooManager.initializeServer(guildId);
+            const zooState = zooManager.getZooState(guildId);
+            const totalBirds = zooState.森林.length + zooState.草原.length + zooState.水辺.length;
+
+            const morningMessages = [
+                `🌅 おはようございます！今日も鳥類園に${totalBirds}羽の鳥たちが元気に過ごしています`,
+                `☀️ 新しい一日の始まりです！鳥たちも活動を開始しました`,
+                `🐦 鳥たちの一日が始まりました！今日はどんな発見があるでしょうか`,
+                `🌤️ 今日も鳥類園は賑やかです！${totalBirds}羽の鳥たちが皆さんを待っています`
+            ];
+
+            const randomMessage = morningMessages[Math.floor(Math.random() * morningMessages.length)];
+
+            await channel.send({
+                content: `${randomMessage}\n\n\`/zoo view\` で鳥たちの様子を見てみましょう！`
+            });
+
+        } catch (error) {
+            console.error(`朝の挨拶投稿エラー (${guild.name}):`, error);
+        }
+    }
+}
+
+// scheduler.js の initialize 関数内に追加
+function initializeZooScheduler() {
+    console.log('🏞️ 鳥類園自動投稿スケジュールを設定中...');
+    
+    // タスクを開始
+    zooStatusTask.start();
+    morningZooTask.start();
+    
+    console.log('✅ 鳥類園自動投稿スケジュールを開始しました');
+    console.log('  - 鳥類園状況投稿: 毎日 9:00, 18:00');
+    console.log('  - 朝の挨拶: 毎日 8:00');
+},
 
     // メンテナンス実行
     async performMaintenance() {
