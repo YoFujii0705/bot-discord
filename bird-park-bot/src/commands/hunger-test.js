@@ -204,4 +204,4 @@ async resetHunger(interaction, birdName, guildId) {
             `🧪 この鳥類園の${count}羽の鳥の空腹状態をリセットしました。`,
         ephemeral: true
     });
-}
+};
