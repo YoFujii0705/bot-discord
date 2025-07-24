@@ -288,7 +288,6 @@ module.exports = {
 
     return embed;
 },
-
     checkForSpecialEvents(birdInfo, food, preference, interaction, guildId) {
         const result = this.processFeedingResult(birdInfo, food, preference, interaction.user);
         
