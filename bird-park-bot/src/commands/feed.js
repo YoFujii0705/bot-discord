@@ -281,25 +281,26 @@ module.exports = {
         return embed;
     },
 
-    async checkForSpecialEvents(birdInfo, food, preference, interaction, guildId) {
+    checkForSpecialEvents(birdInfo, food, preference, interaction, guildId) {
         const result = this.processFeedingResult(birdInfo, food, preference, interaction.user);
         
         if (Math.random() < result.specialChance) {
             const event = this.generateSpecialEvent(birdInfo, food, preference, interaction.user);
             
-            setTimeout(async () => {
-                try {
-                    await interaction.followUp({ embeds: [event.embed] });
-                    
-                    await logger.logEvent(
-                        '餌やりイベント',
-                        event.description,
-                        birdInfo.bird.name,
-                        guildId
-                    );
-                } catch (error) {
-                    console.error('特別イベント送信エラー:', error);
-                }
+            // 3秒後に実行（Promiseチェーンを使用）
+            setTimeout(() => {
+                interaction.followUp({ embeds: [event.embed] })
+                    .then(() => {
+                        return logger.logEvent(
+                            '餌やりイベント',
+                            event.description,
+                            birdInfo.bird.name,
+                            guildId
+                        );
+                    })
+                    .catch(error => {
+                        console.error('特別イベント送信エラー:', error);
+                    });
             }, 3000);
         }
     },
