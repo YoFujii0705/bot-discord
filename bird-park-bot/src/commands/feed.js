@@ -151,136 +151,121 @@ module.exports = {
         return { canFeed: true };
     },
 
-    processFeedingResult(birdInfo, food, preference, user) {
-        const results = {
-            favorite: {
-                effect: '大喜び',
-                message: 'は大好物の餌に大喜びしています！✨',
-                stayExtension: 2,
-                moodChange: 'happy',
-                specialChance: 0.15
-            },
-            acceptable: {
-                effect: '満足',
-                message: 'は餌をおいしそうに食べました！',
-                stayExtension: 1,
-                moodChange: 'normal',
-                specialChance: 0.05
-            },
-            dislike: {
-                effect: '微妙',
-                message: 'は餌をつついてみましたが、あまり興味がないようです...',
-                stayExtension: 0,
-                moodChange: 'normal',
-                specialChance: 0.02
+    // feed.js の processFeedingResult 関数を以下に置き換えてください
+
+processFeedingResult(birdInfo, food, preference, user) {
+    const results = {
+        favorite: {
+            effect: '大喜び',
+            message: 'は大好物の餌に大喜びしています！✨',
+            moodChange: 'happy',
+            specialChance: 0.15,
+            // 滞在時間延長をランダム化
+            getStayExtension: () => {
+                return Math.random() < 0.9 ? 3 : 6; // 90%で3時間、10%で6時間
             }
-        };
-
-        return results[preference] || results.acceptable;
-    },
-
-    updateBirdAfterFeeding(bird, food, preference, userId) {
-        const now = new Date();
-        const result = this.processFeedingResult(null, food, preference, null);
-        
-        bird.lastFed = now;
-        bird.lastFedBy = userId;
-        bird.feedCount = (bird.feedCount || 0) + 1;
-        bird.mood = result.moodChange;
-        
-        if (result.stayExtension > 0) {
-            bird.stayExtension = (bird.stayExtension || 0) + result.stayExtension;
+        },
+        acceptable: {
+            effect: '満足',
+            message: 'は餌をおいしそうに食べました！',
+            moodChange: 'normal',
+            specialChance: 0.05,
+            getStayExtension: () => {
+                return Math.random() < 0.7 ? 1 : 0; // 70%で1時間、30%で効果なし
+            }
+        },
+        dislike: {
+            effect: '微妙',
+            message: 'は餌をつついてみましたが、あまり興味がないようです...',
+            moodChange: 'normal',
+            specialChance: 0.02,
+            getStayExtension: () => 0 // 効果なし
         }
-        
-        bird.activity = this.generateFeedingActivity(food, preference);
-        
-        if (!bird.feedHistory) bird.feedHistory = [];
-        bird.feedHistory.push({
-            food,
-            preference,
-            time: now,
-            fedBy: userId
-        });
+    };
 
-        bird.isHungry = false;
-    },
+    const result = results[preference] || results.acceptable;
+    // 滞在時間延長を動的に計算
+    result.stayExtension = result.getStayExtension();
+    
+    return result;
+},
 
-    generateFeedingActivity(food, preference) {
-        const activities = {
-            favorite: [
-                'とても満足そうにしています',
-                '嬉しそうに羽ばたいています',
-                'ご機嫌で歌っています',
-                '幸せそうに羽繕いしています'
-            ],
-            acceptable: [
-                'おなかいっぱいで休んでいます',
-                '満足そうに過ごしています',
-                '穏やかに過ごしています',
-                'のんびりしています'
-            ],
-            dislike: [
-                '別の餌を探しているようです',
-                '少し困惑しているようです',
-                '他の餌に興味を示しています',
-                '様子を見ています'
-            ]
-        };
+// updateBirdAfterFeeding 関数内の滞在時間更新部分も修正
+updateBirdAfterFeeding(bird, food, preference, userId) {
+    const now = new Date();
+    const result = this.processFeedingResult(null, food, preference, null);
+    
+    bird.lastFed = now;
+    bird.lastFedBy = userId;
+    bird.feedCount = (bird.feedCount || 0) + 1;
+    bird.mood = result.moodChange;
+    
+    // 滞在時間延長を時間単位で管理
+    if (result.stayExtension > 0) {
+        if (!bird.stayExtensionHours) bird.stayExtensionHours = 0;
+        bird.stayExtensionHours += result.stayExtension;
+    }
+    
+    bird.activity = this.generateFeedingActivity(food, preference);
+    
+    if (!bird.feedHistory) bird.feedHistory = [];
+    bird.feedHistory.push({
+        food,
+        preference,
+        time: now,
+        fedBy: userId
+    });
 
-        const activityList = activities[preference] || activities.acceptable;
-        return activityList[Math.floor(Math.random() * activityList.length)];
-    },
+    bird.isHungry = false;
+},
 
-    createFeedingResultEmbed(birdInfo, food, result) {
-        const { bird, area } = birdInfo;
-        
-        const foodEmojis = {
-            '麦': '🌾',
-            '🌾麦': '🌾',
-            '虫': '🐛',
-            '🐛虫': '🐛',
-            '魚': '🐟',
-            '🐟魚': '🐟',
-            '花蜜': '🍯',
-            '🍯花蜜': '🍯',
-            '木の実': '🥜',
-            '🥜木の実': '🥜',
-            '青菜': '🌿',
-            '🌿青菜': '🌿',
-            'ねずみ': '🐁',
-            '🐁ねずみ': '🐁'
-        };
-        
-        const effectColors = {
-            '大喜び': 0xFF69B4,
-            '満足': 0x00FF00,
-            '微妙': 0xFFA500
-        };
+// createFeedingResultEmbed 関数の効果表示部分も修正
+createFeedingResultEmbed(birdInfo, food, result) {
+    const { bird, area } = birdInfo;
+    
+    const foodEmojis = {
+        '麦': '🌾', '🌾麦': '🌾',
+        '虫': '🐛', '🐛虫': '🐛',
+        '魚': '🐟', '🐟魚': '🐟',
+        '花蜜': '🍯', '🍯花蜜': '🍯',
+        '木の実': '🥜', '🥜木の実': '🥜',
+        '青菜': '🌿', '🌿青菜': '🌿',
+        'ねずみ': '🐁', '🐁ねずみ': '🐁'
+    };
+    
+    const effectColors = {
+        '大喜び': 0xFF69B4,
+        '満足': 0x00FF00,
+        '微妙': 0xFFA500
+    };
 
-        const embed = new EmbedBuilder()
-            .setTitle(`🍽️ 餌やり結果`)
-            .setDescription(`**${bird.name}**${result.message}`)
-            .setColor(effectColors[result.effect] || 0x00AE86)
-            .addFields(
-                { name: '🐦 鳥', value: bird.name, inline: true },
-                { name: '📍 場所', value: `${area}エリア`, inline: true },
-                { name: '🍽️ 餌', value: `${foodEmojis[food]} ${food}`, inline: true },
-                { name: '😊 反応', value: result.effect, inline: true },
-                { name: '📅 効果', value: result.stayExtension > 0 ? `滞在期間 +${result.stayExtension}日` : '効果なし', inline: true },
-                { name: '🎭 現在の様子', value: bird.activity, inline: true }
-            )
-            .setTimestamp();
+    const embed = new EmbedBuilder()
+        .setTitle(`🍽️ 餌やり結果`)
+        .setDescription(`**${bird.name}**${result.message}`)
+        .setColor(effectColors[result.effect] || 0x00AE86)
+        .addFields(
+            { name: '🐦 鳥', value: bird.name, inline: true },
+            { name: '📍 場所', value: `${area}エリア`, inline: true },
+            { name: '🍽️ 餌', value: `${foodEmojis[food]} ${food}`, inline: true },
+            { name: '😊 反応', value: result.effect, inline: true },
+            { 
+                name: '📅 効果', 
+                value: result.stayExtension > 0 ? `滞在期間 +${result.stayExtension}時間` : '効果なし', 
+                inline: true 
+            },
+            { name: '🎭 現在の様子', value: bird.activity, inline: true }
+        )
+        .setTimestamp();
 
-        const feedCount = bird.feedCount || 1;
-        embed.addFields({
-            name: '📊 餌やり統計',
-            value: `この鳥への餌やり回数: ${feedCount}回`,
-            inline: false
-        });
+    const feedCount = bird.feedCount || 1;
+    embed.addFields({
+        name: '📊 餌やり統計',
+        value: `この鳥への餌やり回数: ${feedCount}回`,
+        inline: false
+    });
 
-        return embed;
-    },
-
+    return embed;
+}
     checkForSpecialEvents(birdInfo, food, preference, interaction, guildId) {
         const result = this.processFeedingResult(birdInfo, food, preference, interaction.user);
         
