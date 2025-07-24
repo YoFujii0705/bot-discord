@@ -151,9 +151,7 @@ module.exports = {
         return { canFeed: true };
     },
 
-    // feed.js の processFeedingResult 関数を以下に置き換えてください
-
-processFeedingResult(birdInfo, food, preference, user) {
+    processFeedingResult(birdInfo, food, preference, user) {
     const results = {
         favorite: {
             effect: '大喜び',
@@ -190,8 +188,7 @@ processFeedingResult(birdInfo, food, preference, user) {
     return result;
 },
 
-// updateBirdAfterFeeding 関数内の滞在時間更新部分も修正
-updateBirdAfterFeeding(bird, food, preference, userId) {
+    updateBirdAfterFeeding(bird, food, preference, userId) {
     const now = new Date();
     const result = this.processFeedingResult(null, food, preference, null);
     
@@ -219,8 +216,33 @@ updateBirdAfterFeeding(bird, food, preference, userId) {
     bird.isHungry = false;
 },
 
-// createFeedingResultEmbed 関数の効果表示部分も修正
-createFeedingResultEmbed(birdInfo, food, result) {
+    generateFeedingActivity(food, preference) {
+        const activities = {
+            favorite: [
+                'とても満足そうにしています',
+                '嬉しそうに羽ばたいています',
+                'ご機嫌で歌っています',
+                '幸せそうに羽繕いしています'
+            ],
+            acceptable: [
+                'おなかいっぱいで休んでいます',
+                '満足そうに過ごしています',
+                '穏やかに過ごしています',
+                'のんびりしています'
+            ],
+            dislike: [
+                '別の餌を探しているようです',
+                '少し困惑しているようです',
+                '他の餌に興味を示しています',
+                '様子を見ています'
+            ]
+        };
+
+        const activityList = activities[preference] || activities.acceptable;
+        return activityList[Math.floor(Math.random() * activityList.length)];
+    },
+
+    createFeedingResultEmbed(birdInfo, food, result) {
     const { bird, area } = birdInfo;
     
     const foodEmojis = {
@@ -265,7 +287,8 @@ createFeedingResultEmbed(birdInfo, food, result) {
     });
 
     return embed;
-}
+},
+
     checkForSpecialEvents(birdInfo, food, preference, interaction, guildId) {
         const result = this.processFeedingResult(birdInfo, food, preference, interaction.user);
         
