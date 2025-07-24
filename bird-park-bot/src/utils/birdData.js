@@ -149,6 +149,8 @@ class BirdDataManager {
     // birdData.js の getFoodPreference メソッドを以下に置き換え
 
 // 鳥の好物チェック
+// birdData.js の getFoodPreference メソッドを以下に置き換え
+
 getFoodPreference(birdName, food) {
     // Discord表記からスプレッドシート表記への変換
     const foodMapping = {
@@ -179,6 +181,32 @@ getFoodPreference(birdName, food) {
     const acceptable = bird.食べられる餌 ? bird.食べられる餌.split('、').map(f => f.trim()) : [];
     console.log(`😊 食べられる餌: ${acceptable.join(', ')}`);
     
+    // 詳細デバッグ追加
+    console.log(`🔍 DEBUG - 検索する餌: "${mappedFood}"`);
+    console.log(`🔍 DEBUG - 餌の文字コード:`, [...mappedFood].map(c => c.charCodeAt(0)));
+    
+    favorites.forEach((fav, index) => {
+        console.log(`🔍 DEBUG - 好物[${index}]: "${fav}"`);
+        console.log(`🔍 DEBUG - 好物[${index}]の文字コード:`, [...fav].map(c => c.charCodeAt(0)));
+        console.log(`🔍 DEBUG - includes結果: ${fav.includes(mappedFood)} | ${mappedFood.includes(fav)}`);
+        console.log(`🔍 DEBUG - 完全一致: ${fav === mappedFood}`);
+    });
+    
+    // より厳密なチェック（絵文字を除去して比較）
+    const cleanMappedFood = mappedFood.replace(/[\u{1F000}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
+    console.log(`🔍 DEBUG - 絵文字除去後の餌: "${cleanMappedFood}"`);
+    
+    for (const fav of favorites) {
+        const cleanFav = fav.replace(/[\u{1F000}-\u{1F6FF}]|[\u{1F900}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
+        console.log(`🔍 DEBUG - 絵文字除去後の好物: "${cleanFav}"`);
+        
+        if (cleanFav === cleanMappedFood) {
+            console.log(`✨ 絵文字除去後マッチ: ${mappedFood}は好物です！`);
+            return 'favorite';
+        }
+    }
+    
+    // 従来のチェック
     if (favorites.includes(mappedFood)) {
         console.log(`✨ ${mappedFood}は好物です！`);
         return 'favorite';
