@@ -703,4 +703,76 @@ class ZooManager {
                 if (!birdName || bird.name.includes(birdName) || birdName.includes(bird.name)) {
                     bird.lastFed = fiveHoursAgo;
                     bird.isHungry = true;
-                    bird.hun
+                    bird.hungerNotified = false;
+                    bird.activity = this.generateHungryActivity(area);
+                    count++;
+                    
+                    if (birdName) break;
+                }
+            }
+            if (birdName && count > 0) break;
+        }
+        
+        console.log(`🧪 サーバー ${guildId} で${count}羽の鳥を強制的に空腹状態にしました`);
+        return count;
+    }
+
+    async manualHungerCheck(guildId) {
+        console.log(`🧪 サーバー ${guildId} で手動空腹チェックを実行...`);
+        await this.checkHungerStatus(guildId);
+        return this.getHungerStatistics(guildId);
+    }
+
+    getHungerStatistics(guildId) {
+        const allBirds = this.getAllBirds(guildId);
+        const now = new Date();
+        
+        const stats = {
+            totalBirds: allBirds.length,
+            hungryBirds: 0,
+            birdDetails: []
+        };
+        
+        for (const bird of allBirds) {
+            const lastFeedTime = bird.lastFed || bird.entryTime;
+            const hoursSinceLastFeed = Math.floor((now - lastFeedTime) / (1000 * 60 * 60));
+            
+            if (bird.isHungry) {
+                stats.hungryBirds++;
+            }
+            
+            stats.birdDetails.push({
+                name: bird.name,
+                area: bird.area,
+                isHungry: bird.isHungry,
+                hoursSinceLastFeed: hoursSinceLastFeed,
+                hungerNotified: bird.hungerNotified,
+                activity: bird.activity
+            });
+        }
+        
+        return stats;
+    }
+
+    // システム終了時のクリーンアップ
+    async shutdown() {
+        console.log('🔄 鳥類園管理システムをシャットダウン中...');
+        
+        // 全データを保存
+        await this.saveAllServerZoos();
+        
+        // スケジュールタスク停止
+        this.scheduledTasks.forEach(task => {
+            if (task && typeof task.destroy === 'function') {
+                task.destroy();
+            } else if (task && typeof task.stop === 'function') {
+                task.stop();
+            }
+        });
+        
+        this.scheduledTasks = [];
+        console.log('✅ 鳥類園管理システムのシャットダウン完了');
+    }
+}
+
+module.exports = new ZooManager();
