@@ -87,7 +87,7 @@ module.exports = {
                 guildId
             );
 
-            await this.checkForSpecialEvents(birdInfo, food, preference, interaction, guildId);
+            this.checkForSpecialEvents(birdInfo, food, preference, interaction, guildId);
 
             await zooManager.saveServerZoo(guildId);
 
@@ -287,7 +287,6 @@ module.exports = {
         if (Math.random() < result.specialChance) {
             const event = this.generateSpecialEvent(birdInfo, food, preference, interaction.user);
             
-            // 3秒後に実行（Promiseチェーンを使用）
             setTimeout(() => {
                 interaction.followUp({ embeds: [event.embed] })
                     .then(() => {
@@ -361,102 +360,6 @@ module.exports = {
         const jstTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
         const hour = jstTime.getHours();
         
-        if (hour >= 0 && hour < 7) {
-            const sleepMessages = [
-                '😴 鳥たちはぐっすり眠っています...静かに見守りましょう',
-                '🌙 夜間は鳥たちの睡眠時間です。朝7時以降に餌やりができます',
-                '💤 Zzz... 鳥たちは夢の中。起こさないであげてくださいね',
-                '🌃 夜の鳥類園は静寂に包まれています。鳥たちは朝まで休息中です',
-                '⭐ 星空の下、鳥たちは安らかに眠っています'
-            ];
-            
-            const randomMessage = sleepMessages[Math.floor(Math.random() * sleepMessages.length)];
-            
-            return {
-                isSleeping: true,
-                message: `${randomMessage}\n🌅 餌やり再開時刻: 朝7:00 (JST)`
-            };
-        }
-        
-        return { isSleeping: false };
-    }
-};
-                try {
-                    await interaction.followUp({ embeds: [event.embed] });
-                    
-                    // イベントログ記録（サーバーID追加）
-                    await logger.logEvent(
-                        '餌やりイベント',
-                        event.description,
-                        birdInfo.bird.name,
-                        guildId
-                    );
-                } catch (error) {
-                    console.error('特別イベント送信エラー:', error);
-                }
-            }, 3000); // 3秒後に発生
-        }
-    },
-
-    // 特別イベント生成
-    generateSpecialEvent(birdInfo, food, preference, user) {
-        const { bird, area } = birdInfo;
-        const events = {
-            favorite: [
-                {
-                    type: '仲良し',
-                    description: `${bird.name}が${user.username}さんをとても気に入ったようです！`,
-                    effect: '特別な絆が生まれました'
-                },
-                {
-                    type: '歌声',
-                    description: `${bird.name}が美しい歌声を披露しています♪`,
-                    effect: 'エリア全体が音楽に包まれています'
-                }
-            ],
-            acceptable: [
-                {
-                    type: '探索',
-                    description: `${bird.name}が新しい場所を発見したようです`,
-                    effect: 'エリア内で新しいスポットを見つけました'
-                }
-            ],
-            dislike: [
-                {
-                    type: '学習',
-                    description: `${bird.name}が好みを学習したようです`,
-                    effect: '次回はもっと好みに合う餌が分かるかもしれません'
-                }
-            ]
-        };
-
-        const eventList = events[preference] || events.acceptable;
-        const selectedEvent = eventList[Math.floor(Math.random() * eventList.length)];
-
-        const embed = new EmbedBuilder()
-            .setTitle('✨ 特別なできごと！')
-            .setDescription(selectedEvent.description)
-            .addFields({
-                name: '🎊 効果',
-                value: selectedEvent.effect,
-                inline: false
-            })
-            .setColor(0xFFD700)
-            .setTimestamp();
-
-        return {
-            embed,
-            description: selectedEvent.description
-        };
-    },
-
-    // 鳥たちの睡眠時間チェック
-    checkBirdSleepTime() {
-        const now = new Date();
-        const jstTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
-        const hour = jstTime.getHours();
-        
-        // 0:00-7:00は睡眠時間
         if (hour >= 0 && hour < 7) {
             const sleepMessages = [
                 '😴 鳥たちはぐっすり眠っています...静かに見守りましょう',
