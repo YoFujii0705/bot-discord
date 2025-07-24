@@ -24,189 +24,152 @@ module.exports = {
                         .setRequired(true))),
 
     async execute(interaction) {
-    try {
-        const guildId = interaction.guild.id; // サーバーID取得
-        
-        // サーバー別初期化
-        const zooManager = require('../utils/zooManager');
-        await zooManager.initializeServer(guildId);
-        
-        const subcommand = interaction.options.getSubcommand();
-
-        switch (subcommand) {
-            case 'view':
-                await this.handleViewCommand(interaction, guildId);
-                break;
-            case 'area':
-                await this.handleAreaCommand(interaction, guildId);
-                break;
-        }
-
-    } catch (error) {
-        console.error('鳥類園コマンドエラー:', error);
-        
-        const errorMessage = '鳥類園の表示中にエラーが発生しました。';
         try {
-            if (interaction.replied) {
-                await interaction.followUp({ content: errorMessage, flags: 64 });
-            } else {
-                await interaction.reply({ content: errorMessage, flags: 64 });
+            const guildId = interaction.guild.id;
+            
+            const zooManager = require('../utils/zooManager');
+            await zooManager.initializeServer(guildId);
+            
+            const subcommand = interaction.options.getSubcommand();
+
+            switch (subcommand) {
+                case 'view':
+                    await this.handleViewCommand(interaction, guildId);
+                    break;
+                case 'area':
+                    await this.handleAreaCommand(interaction, guildId);
+                    break;
             }
-        } catch (replyError) {
-            console.log('インタラクションタイムアウト:', replyError.code);
+
+        } catch (error) {
+            console.error('鳥類園コマンドエラー:', error);
+            
+            const errorMessage = '鳥類園の表示中にエラーが発生しました。';
+            try {
+                if (interaction.replied) {
+                    await interaction.followUp({ content: errorMessage, flags: 64 });
+                } else {
+                    await interaction.reply({ content: errorMessage, flags: 64 });
+                }
+            } catch (replyError) {
+                console.log('インタラクションタイムアウト:', replyError.code);
+            }
         }
-    }
-},
-    // 鳥類園全体表示（修正版）
-async handleViewCommand(interaction, guildId) {
-    const embed = this.createZooOverviewEmbed(guildId);
-    const buttons = this.createZooButtons();
-    
-    await interaction.reply({ 
-        embeds: [embed], 
-        components: [buttons] 
-    });
-    
-    // ログ記録
-    await logger.logZoo('全体表示', '全体', '', interaction.user.id, interaction.user.username, guildId);
-},
+    },
 
-    // エリア詳細表示
-   async handleAreaCommand(interaction, guildId) {
-    const area = interaction.options.getString('area');
-    const embed = await this.createAreaDetailEmbed(area, guildId);
-    
-    await interaction.reply({ embeds: [embed] });
-    
-    // ログ記録
-    await logger.logZoo('エリア表示', area, '', interaction.user.id, interaction.user.username, guildId);
-},
+    async handleViewCommand(interaction, guildId) {
+        const embed = this.createZooOverviewEmbed(guildId);
+        const buttons = this.createZooButtons();
+        
+        await interaction.reply({ 
+            embeds: [embed], 
+            components: [buttons] 
+        });
+        
+        await logger.logZoo('全体表示', '全体', '', interaction.user.id, interaction.user.username, guildId);
+    },
 
-    // ボタン作成メソッド（新規追加）
-createZooButtons() {
-    const row = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId('zoo_forest')
-                .setLabel('🌲 森林エリア')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId('zoo_grassland')
-                .setLabel('🌾 草原エリア')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId('zoo_waterside')
-                .setLabel('🌊 水辺エリア')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId('zoo_refresh')
-                .setLabel('🔄 更新')
-                .setStyle(ButtonStyle.Primary)
-        );
-    
-    return row;
-},
+    async handleAreaCommand(interaction, guildId) {
+        const area = interaction.options.getString('area');
+        const embed = await this.createAreaDetailEmbed(area, guildId);
+        
+        await interaction.reply({ embeds: [embed] });
+        
+        await logger.logZoo('エリア表示', area, '', interaction.user.id, interaction.user.username, guildId);
+    },
 
-    // 鳥類園全体のEmbed
     createZooOverviewEmbed(guildId) {
-    const zooManager = require('../utils/zooManager');
-    const zooState = zooManager.getZooState(guildId);
-    const totalBirds = zooState.森林.length + zooState.草原.length + zooState.水辺.length;
-    
-    const embed = new EmbedBuilder()
-        .setTitle('🏞️ オリジナル鳥類園')
-        .setDescription(`現在 **${totalBirds}羽** の鳥たちが園内で過ごしています`)
-        .setColor(0x228B22)
-        .setTimestamp();
+        const zooManager = require('../utils/zooManager');
+        const zooState = zooManager.getZooState(guildId);
+        const totalBirds = zooState.森林.length + zooState.草原.length + zooState.水辺.length;
+        
+        const embed = new EmbedBuilder()
+            .setTitle('🏞️ オリジナル鳥類園')
+            .setDescription(`現在 **${totalBirds}羽** の鳥たちが園内で過ごしています`)
+            .setColor(0x228B22)
+            .setTimestamp();
 
-    // 各エリアの概要
-    const areas = [
-        { name: '🌲 森林エリア', key: '森林', emoji: '🌳' },
-        { name: '🌾 草原エリア', key: '草原', emoji: '🌱' },
-        { name: '🌊 水辺エリア', key: '水辺', emoji: '💧' }
-    ];
+        const areas = [
+            { name: '🌲 森林エリア', key: '森林', emoji: '🌳' },
+            { name: '🌾 草原エリア', key: '草原', emoji: '🌱' },
+            { name: '🌊 水辺エリア', key: '水辺', emoji: '💧' }
+        ];
 
-    areas.forEach(area => {
-        const birds = zooState[area.key];
-        const birdList = birds.length > 0 
-            ? birds.map(bird => {
-                const sizeEmoji = this.getSizeEmoji(bird.data.全長区分);
-                return `${sizeEmoji} ${bird.name}`;
-            }).join('\n')
-            : '(現在いません)';
+        areas.forEach(area => {
+            const birds = zooState[area.key];
+            const birdList = birds.length > 0 
+                ? birds.map(bird => {
+                    const sizeEmoji = this.getSizeEmoji(bird.data.全長区分);
+                    return `${sizeEmoji} ${bird.name}`;
+                }).join('\n')
+                : '(現在いません)';
 
-        embed.addFields({
-            name: `${area.emoji} ${area.name} (${birds.length}/5)`,
-            value: birdList,
-            inline: true
-        });
-    });
-
-    embed.setFooter({ 
-        text: `最終更新: ${zooState.lastUpdate.toLocaleString('ja-JP')}` 
-    });
-
-    return embed;
-},
-
-    // エリア詳細Embed（天気連動・睡眠対応版）
-    async createAreaDetailEmbed(area, guildId) {
-    const areaInfo = {
-        '森林': { emoji: '🌲', description: '高い木々に囲まれた静かなエリア', color: 0x228B22 },
-        '草原': { emoji: '🌾', description: '開けた草地で鳥たちが自由に過ごすエリア', color: 0x9ACD32 },
-        '水辺': { emoji: '🌊', description: '池や小川がある水鳥たちのエリア', color: 0x4682B4 }
-    };
-
-    const info = areaInfo[area];
-    const zooManager = require('../utils/zooManager');
-    const zooState = zooManager.getZooState(guildId);
-    const birds = zooState[area];
-
-        // 睡眠時間チェック
-    const sleepStatus = this.checkSleepTime();
-
-    const embed = new EmbedBuilder()
-        .setTitle(`${info.emoji} ${area}エリア詳細`)
-        .setDescription(sleepStatus.isSleeping ? 
-            `${info.description}\n🌙 現在は夜間のため、鳥たちは静かに眠っています` : 
-            info.description)
-        .setColor(sleepStatus.isSleeping ? 0x2F4F4F : info.color)
-        .setTimestamp();
-
-    if (birds.length === 0) {
-        embed.addFields({
-            name: '現在の状況',
-            value: '現在このエリアには鳥がいません',
-            inline: false
-        });
-    } else {
-        // 鳥ごとの処理（睡眠時は特別ステータス）
-        for (let i = 0; i < birds.length; i++) {
-            const bird = birds[i];
-            const stayDuration = this.getStayDuration(bird.entryTime);
-            let activityText;
-            
-            if (sleepStatus.isSleeping) {
-                // 睡眠時間限定の特別ステータス（天気連動）
-                const sleepActivity = await this.generateSleepActivity(bird, area);
-                activityText = `😴 ${sleepActivity}\n📅 滞在期間: ${stayDuration}`;
-            } else {
-                // 通常時のステータス
-                activityText = `${bird.activity}\n📅 滞在期間: ${stayDuration}`;
-            }
-            
             embed.addFields({
-                name: `${i + 1}. ${this.getSizeEmoji(bird.data.全長区分)} ${bird.name}`,
-                value: activityText,
+                name: `${area.emoji} ${area.name} (${birds.length}/5)`,
+                value: birdList,
                 inline: true
             });
+        });
+
+        embed.setFooter({ 
+            text: `最終更新: ${zooState.lastUpdate.toLocaleString('ja-JP')}` 
+        });
+
+        return embed;
+    },
+
+    async createAreaDetailEmbed(area, guildId) {
+        const areaInfo = {
+            '森林': { emoji: '🌲', description: '高い木々に囲まれた静かなエリア', color: 0x228B22 },
+            '草原': { emoji: '🌾', description: '開けた草地で鳥たちが自由に過ごすエリア', color: 0x9ACD32 },
+            '水辺': { emoji: '🌊', description: '池や小川がある水鳥たちのエリア', color: 0x4682B4 }
+        };
+
+        const info = areaInfo[area];
+        const zooManager = require('../utils/zooManager');
+        const zooState = zooManager.getZooState(guildId);
+        const birds = zooState[area];
+
+        const sleepStatus = this.checkSleepTime();
+
+        const embed = new EmbedBuilder()
+            .setTitle(`${info.emoji} ${area}エリア詳細`)
+            .setDescription(sleepStatus.isSleeping ? 
+                `${info.description}\n🌙 現在は夜間のため、鳥たちは静かに眠っています` : 
+                info.description)
+            .setColor(sleepStatus.isSleeping ? 0x2F4F4F : info.color)
+            .setTimestamp();
+
+        if (birds.length === 0) {
+            embed.addFields({
+                name: '現在の状況',
+                value: '現在このエリアには鳥がいません',
+                inline: false
+            });
+        } else {
+            for (let i = 0; i < birds.length; i++) {
+                const bird = birds[i];
+                const stayDuration = this.getStayDuration(bird.entryTime);
+                let activityText;
+                
+                if (sleepStatus.isSleeping) {
+                    const sleepActivity = await this.generateSleepActivity(bird, area);
+                    activityText = `😴 ${sleepActivity}\n📅 滞在期間: ${stayDuration}`;
+                } else {
+                    activityText = `${bird.activity}\n📅 滞在期間: ${stayDuration}`;
+                }
+                
+                embed.addFields({
+                    name: `${i + 1}. ${this.getSizeEmoji(bird.data.全長区分)} ${bird.name}`,
+                    value: activityText,
+                    inline: true
+                });
+            }
         }
-    }
 
-    return embed;
-},
+        return embed;
+    },
 
-    // 睡眠時間チェック
     checkSleepTime() {
         const now = new Date();
         const jstTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
@@ -219,13 +182,11 @@ createZooButtons() {
         return { isSleeping: false };
     },
 
-    // 睡眠時間限定の特別ステータス生成（天気連動版）
     async generateSleepActivity(bird, area) {
         try {
             const weatherManager = require('../utils/weather');
             const weather = await weatherManager.getCurrentWeather();
             
-            // 天気別睡眠ステータス
             const weatherSleepActivities = {
                 rainy: [
                     '雨音を聞きながら安らかに眠っています',
@@ -251,7 +212,6 @@ createZooButtons() {
                 ]
             };
 
-            // 天気に応じた特別ステータスがあるかチェック
             if (weather.condition !== 'unknown' && weatherSleepActivities[weather.condition]) {
                 const weatherActivities = weatherSleepActivities[weather.condition];
                 return weatherActivities[Math.floor(Math.random() * weatherActivities.length)];
@@ -260,7 +220,6 @@ createZooButtons() {
             console.log('天気取得エラー（睡眠ステータス）:', error.message);
         }
 
-        // 天気情報がない場合は通常の睡眠ステータス
         const sleepActivities = {
             '森林': [
                 '羽を丸めて枝の上で眠っています',
@@ -298,7 +257,6 @@ createZooButtons() {
         return areaActivities[Math.floor(Math.random() * areaActivities.length)];
     },
 
-    // 滞在期間計算
     getStayDuration(entryTime) {
         const now = new Date();
         const diff = now - entryTime;
@@ -312,7 +270,6 @@ createZooButtons() {
         }
     },
 
-    // サイズ絵文字
     getSizeEmoji(size) {
         const sizeEmojis = {
             '小': '🐤',
@@ -321,5 +278,29 @@ createZooButtons() {
             '特大': '🦢'
         };
         return sizeEmojis[size] || '🐦';
+    },
+
+    createZooButtons() {
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('zoo_forest')
+                    .setLabel('🌲 森林エリア')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('zoo_grassland')
+                    .setLabel('🌾 草原エリア')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('zoo_waterside')
+                    .setLabel('🌊 水辺エリア')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('zoo_refresh')
+                    .setLabel('🔄 更新')
+                    .setStyle(ButtonStyle.Primary)
+            );
+        
+        return row;
     }
 };
