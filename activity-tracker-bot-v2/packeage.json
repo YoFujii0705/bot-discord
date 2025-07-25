@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint .",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "discord.js": "^14.14.1",
@@ -14,9 +17,30 @@
     "node-cron": "^3.0.3"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.0.2",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
   },
-  "keywords": ["discord", "bot", "activity", "tracker"],
-  "author": "Your Name",
-  "license": "MIT"
+  "keywords": [
+    "discord",
+    "bot",
+    "activity",
+    "tracker",
+    "books",
+    "movies",
+    "productivity"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YOUR_USERNAME/activity-tracker-bot-v2.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/activity-tracker-bot-v2/issues"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/activity-tracker-bot-v2#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  }
 }
