@@ -89,41 +89,56 @@ class ActivityTrackerBot {
   }
 
   buildCommands() {
-    console.log('コマンド定義開始');
-    
-    const commands = [];
-    
-    // 本管理コマンド
-    const bookCommand = new SlashCommandBuilder()
-      .setName('book')
-      .setDescription('本の管理')
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('add')
-          .setDescription('本を追加')
-          .addStringOption(option =>
-            option.setName('title').setDescription('タイトル').setRequired(true))
-          .addStringOption(option =>
-            option.setName('author').setDescription('作者').setRequired(true))
-          .addStringOption(option =>
-            option.setName('memo').setDescription('備考').setRequired(false)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('start')
-          .setDescription('読み始める')
-          .addIntegerOption(option =>
-            option.setName('id').setDescription('本のID').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand
-          .setName('finish')
-          .setDescription('読み終わる')
-          .addIntegerOption(option =>
-            option.setName('id').setDescription('本のID').setRequired(true)))
-      .addSubcommand(subcommand =>
-        subcommand.setName('list').setDescription('本一覧'));
+  console.log('コマンド定義開始');
+  
+  const commands = [];
+  
+  // 本管理コマンド - 拡張版
+  const bookCommand = new SlashCommandBuilder()
+    .setName('book')
+    .setDescription('本の管理')
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('add')
+        .setDescription('本を追加')
+        .addStringOption(option =>
+          option.setName('title').setDescription('タイトル').setRequired(true))
+        .addStringOption(option =>
+          option.setName('author').setDescription('作者').setRequired(true))
+        .addStringOption(option =>
+          option.setName('status').setDescription('初期ステータス').setRequired(false)
+            .addChoices(
+              { name: '買いたい', value: 'want_to_buy' },
+              { name: '積んでいる', value: 'want_to_read' }
+            ))
+        .addStringOption(option =>
+          option.setName('memo').setDescription('備考').setRequired(false)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('buy')
+        .setDescription('本を購入した（want_to_buy → want_to_read）')
+        .addIntegerOption(option =>
+          option.setName('id').setDescription('本のID').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('start')
+        .setDescription('読み始める')
+        .addIntegerOption(option =>
+          option.setName('id').setDescription('本のID').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('finish')
+        .setDescription('読み終わる')
+        .addIntegerOption(option =>
+          option.setName('id').setDescription('本のID').setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand.setName('list').setDescription('本一覧'))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('wishlist')
+        .setDescription('買いたい本一覧を表示'));
 
-    commands.push(bookCommand);
-
+  commands.push(bookCommand);
     // 映画管理コマンド
     const movieCommand = new SlashCommandBuilder()
       .setName('movie')
@@ -370,77 +385,126 @@ commands.push(reportSearchCommand);
 
   // 修正: handleBookCommand - 全てeditReplyに変更
   async handleBookCommand(interaction) {
-    const subcommand = interaction.options.getSubcommand();
-    
-    try {
-      switch (subcommand) {
-        case 'add':
-          const title = interaction.options.getString('title');
-          const author = interaction.options.getString('author');
-          const memo = interaction.options.getString('memo') || '';
-          
-          const bookId = await this.addBook(title, author, memo);
-          await interaction.editReply(`📚 本を追加しました！\nID: ${bookId}\nタイトル: ${title}\n作者: ${author}`);
-          break;
+  const subcommand = interaction.options.getSubcommand();
+  
+  try {
+    switch (subcommand) {
+      case 'add':
+        const title = interaction.options.getString('title');
+        const author = interaction.options.getString('author');
+        const status = interaction.options.getString('status') || 'want_to_read'; // デフォルトを積読に
+        const memo = interaction.options.getString('memo') || '';
         
-        case 'start':
-          const startId = interaction.options.getInteger('id');
-          const startedBook = await this.startReading(startId);
-          if (startedBook) {
-            const embed = new EmbedBuilder()
-              .setTitle('📖 読書開始！')
-              .setColor('#00ff00')
-              .addFields(
-                { name: 'タイトル', value: startedBook.title, inline: true },
-                { name: '作者', value: startedBook.author, inline: true },
-                { name: 'ID', value: startedBook.id.toString(), inline: true }
-              )
-              .setDescription('頑張って読み進めましょう！✨')
-              .setTimestamp();
-            
-            await interaction.editReply({ embeds: [embed] });
-          } else {
-            await interaction.editReply('指定されたIDの本が見つかりませんでした。');
-          }
-          break;
+        const bookId = await this.addBookWithStatus(title, author, status, memo);
         
-        case 'finish':
-          const finishId = interaction.options.getInteger('id');
-          const finishedBook = await this.finishReading(finishId);
-          if (finishedBook) {
-            const embed = new EmbedBuilder()
-              .setTitle('🎉 読了おめでとうございます！')
-              .setColor('#ffd700')
-              .addFields(
-                { name: 'タイトル', value: finishedBook.title, inline: true },
-                { name: '作者', value: finishedBook.author, inline: true },
-                { name: 'ID', value: finishedBook.id.toString(), inline: true },
-                { name: '備考', value: finishedBook.memo || 'なし', inline: false }
-              )
-              .setDescription('素晴らしい達成感ですね！次の本も楽しみです📚✨')
-              .setTimestamp();
-            
-            await interaction.editReply({ embeds: [embed] });
-          } else {
-            await interaction.editReply('指定されたIDの本が見つかりませんでした。');
-          }
-          break;
+        const statusText = {
+          'want_to_buy': '買いたい',
+          'want_to_read': '積んでいる'
+        };
         
-        case 'list':
-          const books = await this.getBooks();
+        await interaction.editReply(
+          `📚 本を追加しました！\n` +
+          `ID: ${bookId}\n` +
+          `タイトル: ${title}\n` +
+          `作者: ${author}\n` +
+          `ステータス: ${statusText[status]}`
+        );
+        break;
+      
+      case 'buy':
+        const buyId = interaction.options.getInteger('id');
+        const boughtBook = await this.buyBook(buyId);
+        if (boughtBook) {
           const embed = new EmbedBuilder()
-            .setTitle('📚 本一覧')
-            .setColor('#0099ff')
-            .setDescription(books.length > 0 ? books.join('\n') : '登録されている本はありません');
+            .setTitle('🛒 本を購入しました！')
+            .setColor('#4caf50')
+            .addFields(
+              { name: 'タイトル', value: boughtBook.title, inline: true },
+              { name: '作者', value: boughtBook.author, inline: true },
+              { name: 'ID', value: boughtBook.id.toString(), inline: true }
+            )
+            .setDescription('積読リストに追加されました！📚✨\n読む準備ができたら `/book start` で読書を開始しましょう！')
+            .setTimestamp();
           
           await interaction.editReply({ embeds: [embed] });
-          break;
-      }
-    } catch (error) {
-      console.error('Book command error:', error);
-      await interaction.editReply('処理中にエラーが発生しました。');
+        } else {
+          await interaction.editReply('指定されたIDの本が見つからないか、既に購入済みです。');
+        }
+        break;
+      
+      case 'start':
+        const startId = interaction.options.getInteger('id');
+        const startedBook = await this.startReading(startId);
+        if (startedBook) {
+          const embed = new EmbedBuilder()
+            .setTitle('📖 読書開始！')
+            .setColor('#00ff00')
+            .addFields(
+              { name: 'タイトル', value: startedBook.title, inline: true },
+              { name: '作者', value: startedBook.author, inline: true },
+              { name: 'ID', value: startedBook.id.toString(), inline: true }
+            )
+            .setDescription('頑張って読み進めましょう！✨')
+            .setTimestamp();
+          
+          await interaction.editReply({ embeds: [embed] });
+        } else {
+          await interaction.editReply('指定されたIDの本が見つかりませんでした。');
+        }
+        break;
+      
+      case 'finish':
+        const finishId = interaction.options.getInteger('id');
+        const finishedBook = await this.finishReading(finishId);
+        if (finishedBook) {
+          const embed = new EmbedBuilder()
+            .setTitle('🎉 読了おめでとうございます！')
+            .setColor('#ffd700')
+            .addFields(
+              { name: 'タイトル', value: finishedBook.title, inline: true },
+              { name: '作者', value: finishedBook.author, inline: true },
+              { name: 'ID', value: finishedBook.id.toString(), inline: true },
+              { name: '備考', value: finishedBook.memo || 'なし', inline: false }
+            )
+            .setDescription('素晴らしい達成感ですね！次の本も楽しみです📚✨')
+            .setTimestamp();
+          
+          await interaction.editReply({ embeds: [embed] });
+        } else {
+          await interaction.editReply('指定されたIDの本が見つかりませんでした。');
+        }
+        break;
+      
+      case 'list':
+        const books = await this.getBooks();
+        const embed = new EmbedBuilder()
+          .setTitle('📚 本一覧')
+          .setColor('#0099ff')
+          .setDescription(books.length > 0 ? books.join('\n') : '登録されている本はありません');
+        
+        await interaction.editReply({ embeds: [embed] });
+        break;
+      
+      case 'wishlist':
+        const wishlistBooks = await this.getWishlistBooks();
+        const embed2 = new EmbedBuilder()
+          .setTitle('🛒 買いたい本一覧')
+          .setColor('#ff9800')
+          .setDescription(
+            wishlistBooks.length > 0 
+              ? wishlistBooks.join('\n') 
+              : '買いたい本はありません'
+          )
+          .setFooter({ text: '購入したら /book buy [ID] で積読リストに移動できます' });
+        
+        await interaction.editReply({ embeds: [embed2] });
+        break;
     }
+  } catch (error) {
+    console.error('Book command error:', error);
+    await interaction.editReply('処理中にエラーが発生しました。');
   }
+}
 
   // 修正: handleMovieCommand - 全てeditReplyに変更
   async handleMovieCommand(interaction) {
@@ -854,6 +918,157 @@ async addDailyReport(category, id, content) {
     return Math.floor(Math.random() * 1000) + Date.now() % 1000;
   }
 }
+
+  async addBookWithStatus(title, author, status, memo) {
+  if (!this.auth) return Math.floor(Math.random() * 1000);
+  
+  try {
+    const auth = await this.auth.getClient();
+    const id = await this.getNextId('books_master');
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Operation timeout')), 5000)
+    );
+    
+    const operationPromise = this.sheets.spreadsheets.values.append({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'books_master!A:G',
+      valueInputOption: 'RAW',
+      resource: {
+        values: [[id, now, title, author, memo, status, '']] // statusの位置を変更
+      }
+    });
+    
+    await Promise.race([operationPromise, timeoutPromise]);
+    console.log('✅ 本の追加成功:', id);
+    return id;
+    
+  } catch (error) {
+    console.error('❌ addBookWithStatus エラー:', error);
+    return Math.floor(Math.random() * 1000) + Date.now() % 1000;
+  }
+}
+
+async buyBook(id) {
+  if (!this.auth) return { id, title: 'テスト本', author: 'テスト作者' };
+  
+  const maxRetries = 3;
+  let retries = 0;
+  
+  while (retries < maxRetries) {
+    try {
+      const auth = await this.auth.getClient();
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Operation timeout')), 10000)
+      );
+      
+      const getPromise = this.sheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range: 'books_master!A:G'
+      });
+      
+      const response = await Promise.race([getPromise, timeoutPromise]);
+      const values = response.data.values || [];
+      const rowIndex = values.findIndex(row => row[0] == id && row[5] === 'want_to_buy');
+      
+      if (rowIndex !== -1) {
+        const updatePromise = this.sheets.spreadsheets.values.update({
+          auth,
+          spreadsheetId: this.spreadsheetId,
+          range: `books_master!F${rowIndex + 1}`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['want_to_read']]
+          }
+        });
+        
+        await Promise.race([updatePromise, timeoutPromise]);
+        
+        const row = values[rowIndex];
+        return {
+          id: row[0],
+          title: row[2],
+          author: row[3],
+          memo: row[4]
+        };
+      }
+      
+      return null;
+      
+    } catch (error) {
+      console.error(`buyBook attempt ${retries + 1} failed:`, error);
+      retries++;
+      
+      if (retries >= maxRetries) {
+        console.error('buyBook max retries reached');
+        return null;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries)));
+    }
+  }
+}
+
+async getWishlistBooks() {
+  if (!this.auth) return ['🛒 [1] テスト本 - テスト作者'];
+  
+  try {
+    const auth = await this.auth.getClient();
+    
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Operation timeout')), 10000)
+    );
+    
+    const operationPromise = this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'books_master!A:G'
+    });
+    
+    const response = await Promise.race([operationPromise, timeoutPromise]);
+    const values = response.data.values || [];
+    
+    return values.slice(1)
+      .filter(row => row[5] === 'want_to_buy')
+      .map(row => {
+        const [id, date, title, author] = row;
+        return `🛒 [${id}] ${title} - ${author}`;
+      });
+    
+  } catch (error) {
+    console.error('getWishlistBooks エラー:', error);
+    return [];
+  }
+}
+
+async getWantToReadBooks() {
+  if (!this.auth) return [{ id: 1, title: 'テスト積読本', author: 'テスト作者' }];
+  
+  try {
+    const auth = await this.auth.getClient();
+    const response = await this.sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: this.spreadsheetId,
+      range: 'books_master!A:G'
+    });
+    
+    const values = response.data.values || [];
+    return values.slice(1)
+      .filter(row => row[5] === 'want_to_read')
+      .map(row => ({
+        id: row[0],
+        title: row[2],
+        author: row[3]
+      }));
+  } catch (error) {
+    console.error('getWantToReadBooks エラー:', error);
+    return [];
+  }
+}
   
   // 修正: handleStatsCommand - editReplyに変更
   async handleStatsCommand(interaction) {
@@ -1128,53 +1343,62 @@ async addDailyReport(category, id, content) {
   }
 
   async getBooks() {
-    if (!this.auth) return ['📋 [1] テスト本 - テスト作者 (registered)'];
-    
-    const maxRetries = 3;
-    let retries = 0;
-    
-    while (retries < maxRetries) {
-      try {
-        const auth = await this.auth.getClient();
+  if (!this.auth) return ['📋 [1] テスト本 - テスト作者 (want_to_read)'];
+  
+  const maxRetries = 3;
+  let retries = 0;
+  
+  while (retries < maxRetries) {
+    try {
+      const auth = await this.auth.getClient();
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Operation timeout')), 10000)
+      );
+      
+      const operationPromise = this.sheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId: this.spreadsheetId,
+        range: 'books_master!A:G'
+      });
+      
+      const response = await Promise.race([operationPromise, timeoutPromise]);
+      const values = response.data.values || [];
+      
+      return values.slice(1).map(row => {
+        const [id, date, title, author, memo, status] = row;
+        const statusEmoji = {
+          'want_to_buy': '🛒',
+          'want_to_read': '📋',
+          'reading': '📖',
+          'finished': '✅',
+          'abandoned': '❌'
+        };
         
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Operation timeout')), 10000)
-        );
+        const statusText = {
+          'want_to_buy': '買いたい',
+          'want_to_read': '積読',
+          'reading': '読書中',
+          'finished': '読了',
+          'abandoned': '中断'
+        };
         
-        const operationPromise = this.sheets.spreadsheets.values.get({
-          auth,
-          spreadsheetId: this.spreadsheetId,
-          range: 'books_master!A:G'
-        });
-        
-        const response = await Promise.race([operationPromise, timeoutPromise]);
-        const values = response.data.values || [];
-        
-        return values.slice(1).map(row => {
-          const [id, date, title, author, memo, status] = row;
-          const statusEmoji = {
-            'registered': '📋',
-            'reading': '📖',
-            'finished': '✅',
-            'abandoned': '❌'
-          };
-          
-          return `${statusEmoji[status] || '📋'} [${id}] ${title} - ${author} (${status})`;
-        });
-        
-      } catch (error) {
-        console.error(`getBooks attempt ${retries + 1} failed:`, error);
-        retries++;
-        
-        if (retries >= maxRetries) {
-          console.error('getBooks max retries reached, using fallback');
-          return ['📋 [1] テスト本 - テスト作者 (registered)'];
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries)));
+        return `${statusEmoji[status] || '📋'} [${id}] ${title} - ${author} (${statusText[status] || status})`;
+      });
+      
+    } catch (error) {
+      console.error(`getBooks attempt ${retries + 1} failed:`, error);
+      retries++;
+      
+      if (retries >= maxRetries) {
+        console.error('getBooks max retries reached, using fallback');
+        return ['📋 [1] テスト本 - テスト作者 (want_to_read)'];
       }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries)));
     }
   }
+}
 
   async addMovie(title, memo) {
   if (!this.auth) return Math.floor(Math.random() * 1000);
@@ -1866,15 +2090,22 @@ async getItemInfo(category, id) {
 
   // 定期通知機能のセットアップ
   setupScheduledTasks() {
-    const cron = require('node-cron');
-    console.log('定期通知機能を初期化しています...');
-    
-    // 毎朝7時: 読書中の本を通知
-    cron.schedule('0 7 * * *', async () => {
-      await this.sendMorningReminder();
-    }, {
-      timezone: "Asia/Tokyo"
-    });
+  const cron = require('node-cron');
+  console.log('定期通知機能を初期化しています...');
+  
+  // 毎朝7時: 読書中・積読の本を通知
+  cron.schedule('0 7 * * *', async () => {
+    await this.sendMorningReminder();
+  }, {
+    timezone: "Asia/Tokyo"
+  });
+  
+  // 毎月1日8時: 買いたい本リスト通知 ★新規追加★
+  cron.schedule('0 8 1 * *', async () => {
+    await this.sendMonthlyWishlist();
+  }, {
+    timezone: "Asia/Tokyo"
+  });
     
     // 毎週日曜日21時: 週次レポート
     cron.schedule('0 21 * * 0', async () => {
@@ -1946,34 +2177,94 @@ async getItemInfo(category, id) {
     return null;
   }
 
-  async sendMorningReminder() {
-    try {
-      const readingBooks = await this.getCurrentReadingBooks();
+  async sendMonthlyWishlist() {
+  try {
+    const wishlistBooks = await this.getWishlistBooks();
+    
+    const channel = this.getNotificationChannel();
+    if (channel && wishlistBooks.length > 0) {
+      const embed = new EmbedBuilder()
+        .setTitle('🛒 月初の買いたい本リスト')
+        .setDescription('新しい月が始まりました！気になっていた本を購入してみませんか？📚✨')
+        .addFields({
+          name: `📋 買いたい本一覧 (${wishlistBooks.length}冊)`,
+          value: wishlistBooks.join('\n'),
+          inline: false
+        })
+        .setColor('#4caf50')
+        .setFooter({ text: '購入したら /book buy [ID] で積読リストに移動できます' })
+        .setTimestamp();
       
-      if (readingBooks.length > 0) {
-        const channel = this.getNotificationChannel();
-        if (channel) {
-          const embed = new EmbedBuilder()
-            .setTitle('☀️ おはようございます！')
-            .setDescription('今日はどの本を読みますか？📚')
-            .addFields({
-              name: '📖 読書中の本',
-              value: readingBooks.map(book => `• [${book.id}] ${book.title} - ${book.author}`).join('\n'),
-              inline: false
-            })
-            .setColor('#ffeb3b')
-            .setTimestamp();
-          
-          await channel.send({ embeds: [embed] });
-          console.log('朝の通知を送信しました');
-        } else {
-          console.log('通知チャンネルが見つかりませんでした');
-        }
-      }
-    } catch (error) {
-      console.error('朝の通知エラー:', error);
+      await channel.send({ embeds: [embed] });
+      console.log('月初買いたい本リストを送信しました');
+    } else if (channel && wishlistBooks.length === 0) {
+      const embed = new EmbedBuilder()
+        .setTitle('🛒 買いたい本リスト')
+        .setDescription('現在、買いたい本リストは空です。\n新しい本を探してみませんか？📚')
+        .setColor('#ff9800')
+        .setTimestamp();
+      
+      await channel.send({ embeds: [embed] });
+      console.log('空の買いたい本リスト通知を送信しました');
+    } else {
+      console.log('通知チャンネルが見つかりませんでした');
     }
+  } catch (error) {
+    console.error('月初買いたい本リスト通知エラー:', error);
   }
+}
+
+  async sendMorningReminder() {
+  try {
+    const [readingBooks, wantToReadBooks] = await Promise.all([
+      this.getCurrentReadingBooks(),
+      this.getWantToReadBooks()
+    ]);
+    
+    if (readingBooks.length > 0 || wantToReadBooks.length > 0) {
+      const channel = this.getNotificationChannel();
+      if (channel) {
+        const embed = new EmbedBuilder()
+          .setTitle('☀️ おはようございます！')
+          .setDescription('今日はどの本を読みますか？📚')
+          .setColor('#ffeb3b')
+          .setTimestamp();
+        
+        if (readingBooks.length > 0) {
+          embed.addFields({
+            name: '📖 読書中の本',
+            value: readingBooks.map(book => `• [${book.id}] ${book.title} - ${book.author}`).join('\n'),
+            inline: false
+          });
+        }
+        
+        if (wantToReadBooks.length > 0) {
+          const displayBooks = wantToReadBooks.slice(0, 5); // 最大5冊まで表示
+          embed.addFields({
+            name: '📋 積んでいる本',
+            value: displayBooks.map(book => `• [${book.id}] ${book.title} - ${book.author}`).join('\n'),
+            inline: false
+          });
+          
+          if (wantToReadBooks.length > 5) {
+            embed.setFooter({ text: `他${wantToReadBooks.length - 5}冊の積読本があります` });
+          }
+        }
+        
+        if (wantToReadBooks.length > 0 && readingBooks.length === 0) {
+          embed.setDescription('今日はどの本を読み始めますか？📚\n`/book start [ID]` で読書を開始できます！');
+        }
+        
+        await channel.send({ embeds: [embed] });
+        console.log('朝の通知を送信しました');
+      } else {
+        console.log('通知チャンネルが見つかりませんでした');
+      }
+    }
+  } catch (error) {
+    console.error('朝の通知エラー:', error);
+  }
+}
 
   async sendLogReminder() {
     try {
