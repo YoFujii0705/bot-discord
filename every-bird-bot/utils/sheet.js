@@ -4,7 +4,7 @@ const config = require('../config.json');
 
 // Google Sheets API初期化
 const auth = new google.auth.GoogleAuth({
-    keyFile: './google-credentials.json',
+    keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEY || './google-credentials.json',
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
