@@ -460,16 +460,16 @@ async function handleHabitEditSelection(interaction) {
 
 async function handleDailyMotivation(interaction) {
     const motivationMessages = [
-        '今日という日は、残りの人生の最初の日だ！ 🌟',
-        '小さな一歩が大きな変化を生む 👣',
-        '継続は力なり。今日も一歩前進しよう！ 💪',
-        '完璧を目指さず、進歩を目指そう 📈',
-        '今日の努力は明日の自分への贈り物 🎁',
-        '習慣が人を作る。素晴らしい習慣を築こう 🏗️',
-        '今日できることに集中しよう！ 🎯',
-        '成功は日々の小さな努力の積み重ね ⭐',
-        '挑戦することで新しい自分に出会える 🚀',
-        '今日も素晴らしい一日にしていこう！ ✨'
+        '今日もやっていくよ〜 🌟',
+        'やっていき、やっていき 👣',
+        'がんばりの翁 💪',
+        'アゲ 📈',
+        'every birdもすごいすごいと言っています 🎁',
+        'マザー・テレサも喜んどるね 🏗️',
+        'いきまっせ〜 🎯',
+        'やっとるか〜？ ⭐',
+        'かなりの飛躍が認められる 🚀',
+        '素晴らしい一日、ワンダーデイ ✨'
     ];
     
     const randomMessage = motivationMessages[Math.floor(Math.random() * motivationMessages.length)];
