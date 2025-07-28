@@ -1,0 +1,16 @@
+{
+  "name": "novel-progress-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for novel writing progress management",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+  "discord.js": "^14.11.0",
+  "googleapis": "^118.0.0",
+  "moment": "^2.29.4",
+  "node-cron": "^3.0.2",
+  "dotenv": "^16.3.1"
+}
+}
