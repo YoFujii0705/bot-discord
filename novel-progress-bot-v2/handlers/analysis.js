@@ -78,110 +78,7 @@ async function handlePaceAnalysis(interaction) {
         await interaction.editReply({ embeds: [embed] });
 
     } catch (error) {
-        console.error('執筆習慣取得エラー:', error);
-        await interaction.editReply('❌ 執筆習慣の取得中にエラーが発生しました。');
-    }
-}
-
-async function handleWorkEvaluation(interaction) {
-    await interaction.deferReply();
-
-    try {
-        const workId = interaction.options.getInteger('id');
-        const evaluationItem = interaction.options.getString('評価項目');
-        const completionRate = interaction.options.getInteger('完成度');
-        const evaluationMemo = interaction.options.getString('評価メモ') || '';
-
-        // 作品を検索
-        const workData = await findWorkById(workId);
-        if (!workData) {
-            await interaction.editReply(`❌ ID ${workId} の作品が見つかりません。`);
-            return;
-        }
-
-        const title = workData.title;
-        const today = moment().format('YYYY-MM-DD');
-
-        // 作業評価をスプレッドシートに記録
-        await recordWorkEvaluation(title, evaluationItem, completionRate, evaluationMemo, today);
-
-        // 評価に応じた絵文字とメッセージ
-        const itemEmojis = {
-            'プロット完成度': '🗺️',
-            'キャラクター設定': '👤',
-            'リサーチ進捗': '🔍',
-            '世界観構築': '🌍',
-            '推敲完成度': '✏️'
-        };
-
-        let evaluationMessage = '';
-        if (completionRate >= 90) {
-            evaluationMessage = '🌟 ほぼ完成ですね！素晴らしい進捗です！';
-        } else if (completionRate >= 70) {
-            evaluationMessage = '🔥 順調に進んでいます！もう一息です！';
-        } else if (completionRate >= 50) {
-            evaluationMessage = '💪 半分を超えました！着実な進歩です！';
-        } else if (completionRate >= 30) {
-            evaluationMessage = '✨ 良いスタートを切っています！';
-        } else if (completionRate >= 10) {
-            evaluationMessage = '🌱 最初の一歩を踏み出しました！';
-        } else {
-            evaluationMessage = '📋 現状を把握することから始まります！';
-        }
-
-        const embed = new EmbedBuilder()
-            .setColor(getEvaluationColor(completionRate))
-            .setTitle(`${itemEmojis[evaluationItem] || '📊'} 作業評価記録`)
-            .addFields(
-                { name: '作品', value: title, inline: true },
-                { name: '評価項目', value: evaluationItem, inline: true },
-                { name: '完成度', value: `${completionRate}%`, inline: true }
-            )
-            .setDescription(evaluationMessage)
-            .setTimestamp();
-
-        if (evaluationMemo) {
-            embed.addFields({ name: '評価メモ', value: evaluationMemo, inline: false });
-        }
-
-        // 進捗バーを表示
-        const progressBar = generateProgressBar(completionRate);
-        embed.addFields({ name: '進捗バー', value: progressBar, inline: false });
-
-        await interaction.editReply({ embeds: [embed] });
-
-    } catch (error) {
-        console.error('作業評価エラー:', error);
-        await interaction.editReply('❌ 作業評価中にエラーが発生しました。');
-    }
-}
-
-// 評価に応じた色を取得
-function getEvaluationColor(completionRate) {
-    if (completionRate >= 90) return 0x00ff00; // 緑
-    if (completionRate >= 70) return 0xffff00; // 黄
-    if (completionRate >= 50) return 0xff9900; // オレンジ
-    if (completionRate >= 30) return 0xff6600; // 濃いオレンジ
-    return 0xff0000; // 赤
-}
-
-// 進捗バー生成
-function generateProgressBar(percentage) {
-    const filledBlocks = Math.floor(percentage / 5); // 5%ごとに1ブロック
-    const emptyBlocks = 20 - filledBlocks;
-    
-    const filled = '█'.repeat(filledBlocks);
-    const empty = '░'.repeat(emptyBlocks);
-    
-    return `\`${filled}${empty}\` ${percentage}%`;
-}
-
-module.exports = {
-    handlePaceAnalysis,
-    handleArchive,
-    handleWritingHabit,
-    handleWorkEvaluation
-};error('ペース分析エラー:', error);
+        console.error('ペース分析エラー:', error);
         await interaction.editReply('❌ ペース分析中にエラーが発生しました。');
     }
 }
@@ -300,8 +197,12 @@ async function handleWritingHabit(interaction) {
             const currentDate = moment(date);
 
             if (!lastDate || lastDate.diff(currentDate, 'days') === 1) {
-                currentStreak++;
-                maxStreak = Math.max(maxStreak, currentStreak);
+                if (dailyTotals[date] > 0) {  // 0字の日は連続日数に含めない
+                    currentStreak++;
+                    maxStreak = Math.max(maxStreak, currentStreak);
+                } else {
+                    break;  // 0字の日で連続記録が途切れる
+                }
             } else {
                 break;
             }
@@ -312,7 +213,8 @@ async function handleWritingHabit(interaction) {
         // 統計計算
         const totalDays = Object.keys(dailyTotals).length;
         const totalChars = Object.values(dailyTotals).reduce((sum, chars) => sum + chars, 0);
-        const averageChars = Math.round(totalChars / totalDays);
+        const writingDays = Object.values(dailyTotals).filter(chars => chars > 0).length;
+        const averageChars = writingDays > 0 ? Math.round(totalChars / writingDays) : 0;
         const maxDayChars = Math.max(...Object.values(dailyTotals));
 
         // 最近7日間の執筆状況
@@ -329,7 +231,7 @@ async function handleWritingHabit(interaction) {
             .addFields(
                 { name: '🔥 現在の連続日数', value: `${currentStreak}日`, inline: true },
                 { name: '🏆 最長連続記録', value: `${maxStreak}日`, inline: true },
-                { name: '📊 総執筆日数', value: `${totalDays}日`, inline: true },
+                { name: '📊 総執筆日数', value: `${writingDays}日`, inline: true },
                 { name: '📝 総執筆字数', value: `${totalChars.toLocaleString()}字`, inline: true },
                 { name: '📈 日平均字数', value: `${averageChars}字`, inline: true },
                 { name: '🎯 最高執筆日', value: `${maxDayChars}字`, inline: true }
@@ -341,7 +243,8 @@ async function handleWritingHabit(interaction) {
         recentDays.forEach(day => {
             const bars = Math.floor(day.chars / 100);
             const barChart = '█'.repeat(Math.min(bars, 20));
-            recentChart += `${day.date.slice(5)}: ${barChart} ${day.chars}字\n`;
+            const dayOfWeek = moment(day.date).format('ddd');
+            recentChart += `${day.date.slice(5)}(${dayOfWeek}): ${barChart} ${day.chars}字\n`;
         });
         recentChart += '```';
 
@@ -368,4 +271,107 @@ async function handleWritingHabit(interaction) {
         await interaction.editReply({ embeds: [embed] });
 
     } catch (error) {
-        console.
+        console.error('執筆習慣取得エラー:', error);
+        await interaction.editReply('❌ 執筆習慣の取得中にエラーが発生しました。');
+    }
+}
+
+async function handleWorkEvaluation(interaction) {
+    await interaction.deferReply();
+
+    try {
+        const workId = interaction.options.getInteger('id');
+        const evaluationItem = interaction.options.getString('評価項目');
+        const completionRate = interaction.options.getInteger('完成度');
+        const evaluationMemo = interaction.options.getString('評価メモ') || '';
+
+        // 作品を検索
+        const workData = await findWorkById(workId);
+        if (!workData) {
+            await interaction.editReply(`❌ ID ${workId} の作品が見つかりません。`);
+            return;
+        }
+
+        const title = workData.title;
+        const today = moment().format('YYYY-MM-DD');
+
+        // 作業評価をスプレッドシートに記録
+        await recordWorkEvaluation(title, evaluationItem, completionRate, evaluationMemo, today);
+
+        // 評価に応じた絵文字とメッセージ
+        const itemEmojis = {
+            'プロット完成度': '🗺️',
+            'キャラクター設定': '👤',
+            'リサーチ進捗': '🔍',
+            '世界観構築': '🌍',
+            '推敲完成度': '✏️'
+        };
+
+        let evaluationMessage = '';
+        if (completionRate >= 90) {
+            evaluationMessage = '🌟 ほぼ完成ですね！素晴らしい進捗です！';
+        } else if (completionRate >= 70) {
+            evaluationMessage = '🔥 順調に進んでいます！もう一息です！';
+        } else if (completionRate >= 50) {
+            evaluationMessage = '💪 半分を超えました！着実な進歩です！';
+        } else if (completionRate >= 30) {
+            evaluationMessage = '✨ 良いスタートを切っています！';
+        } else if (completionRate >= 10) {
+            evaluationMessage = '🌱 最初の一歩を踏み出しました！';
+        } else {
+            evaluationMessage = '📋 現状を把握することから始まります！';
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(getEvaluationColor(completionRate))
+            .setTitle(`${itemEmojis[evaluationItem] || '📊'} 作業評価記録`)
+            .addFields(
+                { name: '作品', value: title, inline: true },
+                { name: '評価項目', value: evaluationItem, inline: true },
+                { name: '完成度', value: `${completionRate}%`, inline: true }
+            )
+            .setDescription(evaluationMessage)
+            .setTimestamp();
+
+        if (evaluationMemo) {
+            embed.addFields({ name: '評価メモ', value: evaluationMemo, inline: false });
+        }
+
+        // 進捗バーを表示
+        const progressBar = generateProgressBar(completionRate);
+        embed.addFields({ name: '進捗バー', value: progressBar, inline: false });
+
+        await interaction.editReply({ embeds: [embed] });
+
+    } catch (error) {
+        console.error('作業評価エラー:', error);
+        await interaction.editReply('❌ 作業評価中にエラーが発生しました。');
+    }
+}
+
+// 評価に応じた色を取得
+function getEvaluationColor(completionRate) {
+    if (completionRate >= 90) return 0x00ff00; // 緑
+    if (completionRate >= 70) return 0xffff00; // 黄
+    if (completionRate >= 50) return 0xff9900; // オレンジ
+    if (completionRate >= 30) return 0xff6600; // 濃いオレンジ
+    return 0xff0000; // 赤
+}
+
+// 進捗バー生成
+function generateProgressBar(percentage) {
+    const filledBlocks = Math.floor(percentage / 5); // 5%ごとに1ブロック
+    const emptyBlocks = 20 - filledBlocks;
+    
+    const filled = '█'.repeat(filledBlocks);
+    const empty = '░'.repeat(emptyBlocks);
+    
+    return `\`${filled}${empty}\` ${percentage}%`;
+}
+
+module.exports = {
+    handlePaceAnalysis,
+    handleArchive,
+    handleWritingHabit,
+    handleWorkEvaluation
+};
