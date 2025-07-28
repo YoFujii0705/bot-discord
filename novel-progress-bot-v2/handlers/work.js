@@ -312,4 +312,27 @@ async function handleProgressReport(interaction) {
                 { name: '残り', value: targetChars > 0 ? `${Math.max(0, targetChars - newTotal)}字` : '-', inline: true }
             );
         } else {
-            embed.
+            embed.addFields(
+                { name: '現在の総字数', value: `${currentTotal}字`, inline: true },
+                { name: '目標まで', value: targetChars > 0 ? `${Math.max(0, targetChars - currentTotal)}字` : '未設定', inline: true }
+            );
+        }
+
+        if (memo) {
+            embed.addFields({ name: 'メモ', value: memo, inline: false });
+        }
+
+        await interaction.editReply({ embeds: [embed] });
+
+    } catch (error) {
+        console.error('進捗報告エラー:', error);
+        await interaction.editReply('❌ 進捗報告中にエラーが発生しました。');
+    }
+}
+
+module.exports = {
+    handleWorkRegistration,
+    handleWorkList,
+    handleStatusChange,
+    handleProgressReport
+};
