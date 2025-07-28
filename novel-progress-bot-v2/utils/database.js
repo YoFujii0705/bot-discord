@@ -278,12 +278,134 @@ async function getWorkProgressData(workTitle) {
     }
 }
 
+// 作品統計を取得
+async function getWorksStatistics(startDate, endDate) {
+    try {
+        const { sheets } = require('../config/googleSheets');
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
+            range: '作品管理!A:K',
+        });
+
+        const rows = response.data.values;
+        if (!rows || rows.length <= 1) {
+            return { activeWorks: 0, completedWorks: 0 };
+        }
+
+        let activeWorks = 0;
+        let completedWorks = 0;
+
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const status = row[9];
+            const completedDate = row[8];
+
+            if (status === '着手中') {
+                activeWorks++;
+            } else if (status === '完了' && completedDate) {
+                const completed = moment(completedDate, 'YYYY-MM-DD');
+                if (completed.isBetween(startDate, endDate, 'day', '[]')) {
+                    completedWorks++;
+                }
+            }
+        }
+
+        return { activeWorks, completedWorks };
+
+    } catch (error) {
+        console.error('作品統計取得エラー:', error);
+        return { activeWorks: 0, completedWorks: 0 };
+    }
+}
+
+// 進捗種別付きデータ取得
+async function getAllProgressDataWithTypes() {
+    try {
+        const { sheets } = require('../config/googleSheets');
+        const response = await sheets.spreadsheets.get({
+            spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
+        });
+
+        const allData = [];
+
+        for (const sheet of response.data.sheets) {
+            const sheetName = sheet.properties.title;
+
+            // 管理シートはスキップ
+            if (['作品管理', '執筆統計', '作業評価'].includes(sheetName)) continue;
+
+            try {
+                const sheetData = await sheets.spreadsheets.values.get({
+                    spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
+                    range: `${sheetName}!A:F`,
+                });
+
+                const rows = sheetData.data.values;
+                if (!rows || rows.length <= 4) continue;
+
+                // 5行目以降がデータ
+                for (let i = 4; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (row[0] && moment(row[0], 'YYYY-MM-DD', true).isValid()) {
+                        allData.push({
+                            date: row[0],
+                            chars: parseInt(row[1]) || 0,
+                            work: sheetName,
+                            progressType: row[5] || '執筆' // F列から進捗種別取得
+                        });
+                    }
+                }
+            } catch (sheetError) {
+                continue;
+            }
+        }
+
+        return allData.sort((a, b) => moment(a.date).diff(moment(b.date)));
+
+    } catch (error) {
+        console.error('進捗種別付きデータ取得エラー:', error);
+        return [];
+    }
+}
+
+// 作品進捗データを取得
+async function getWorkProgressData(workTitle) {
+    try {
+        const { sheets } = require('../config/googleSheets');
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
+            range: `${workTitle}!A:E`,
+        });
+
+        const rows = response.data.values;
+        if (!rows || rows.length <= 4) return [];
+
+        const progressData = [];
+        for (let i = 4; i < rows.length; i++) {
+            const row = rows[i];
+            if (row[0] && row[1] && moment(row[0], 'YYYY-MM-DD', true).isValid()) {
+                progressData.push({
+                    date: row[0],
+                    chars: parseInt(row[1]) || 0
+                });
+            }
+        }
+
+        return progressData;
+
+    } catch (error) {
+        console.error('作品進捗データ取得エラー:', error);
+        return [];
+    }
+}
+
 module.exports = {
     findWorkById,
     getNextWorkId,
     createWorkSheet,
     updateStatistics,
-    getActiveWorks,
     getAllProgressData,
+    getWorksStatistics,
+    getAllProgressDataWithTypes,
     getWorkProgressData
 };
