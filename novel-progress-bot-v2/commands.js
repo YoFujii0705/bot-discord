@@ -182,4 +182,6 @@ const commands = [
                 )),
 ];
 
-module.exports = commands;
+module.exports = {
+    commands
+};
