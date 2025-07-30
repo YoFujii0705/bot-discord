@@ -1,0 +1,32 @@
+{
+  "name": "pomodoro-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for Pomodoro Technique with customizable timers",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "nodemon bot.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop pomodoro-bot",
+    "pm2:restart": "pm2 restart pomodoro-bot",
+    "pm2:logs": "pm2 logs pomodoro-bot"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "pomodoro",
+    "timer",
+    "productivity"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
